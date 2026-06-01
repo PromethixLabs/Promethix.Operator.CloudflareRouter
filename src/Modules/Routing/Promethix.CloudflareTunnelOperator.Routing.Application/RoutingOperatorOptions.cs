@@ -9,4 +9,6 @@ public sealed class RoutingOperatorOptions
     public int ReconciliationIntervalSeconds { get; set; } = 30;
 
     public bool ApplyChanges { get; set; }
+
+    public string ManagedByLabelValue { get; set; } = "promethix-cloudflare-tunnel-operator";
 }

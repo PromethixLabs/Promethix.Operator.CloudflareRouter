@@ -14,15 +14,25 @@ The solution uses a single `Routing` capability with explicit `Domain`, `Applica
 
 Managed routes carry an ownership marker. Reconciliation only proposes deletion for routes already owned by this operator instance. That creates room for shared-tunnel scenarios and safer rollout.
 
+### Explicit Kubernetes intent contract
+
+Route intent now lives in a dedicated `TunnelPublicHostname` custom resource rather than annotations on unrelated ingress resources. That keeps tunnel-specific concerns explicit:
+
+- class-based selection
+- tunnel selection
+- origin URL and protocol
+- future Cloudflare-specific options
+- reconciliation status
+
 ### Simple reconciliation flow
 
 The control loop shape is:
 
 ```text
-Kubernetes intent source -> application planner -> Cloudflare adapter -> health/logging
+TunnelPublicHostname CRDs -> Kubernetes integration -> application planner -> Cloudflare adapter -> health/logging
 ```
 
-The current scaffold keeps Kubernetes and Cloudflare interactions behind explicit interfaces. That allows the first implementation to stay testable while leaving room for a later move to real CRDs, watches, finalizers, and status reporting.
+The current scaffold keeps Kubernetes and Cloudflare interactions behind explicit integrations. The Kubernetes side now reads class-filtered CRD intent for a single managed tunnel, leaving room for later watch registration, finalizers, and status updates.
 
 ### Production-minded defaults
 
@@ -38,7 +48,6 @@ The host includes:
 
 Likely next steps:
 
-1. Introduce a concrete CRD for route intent and corresponding status.
-2. Replace the placeholder intent source with a watched Kubernetes source.
-3. Implement the Cloudflare API client and remote diff/application logic.
-4. Add conflict handling, status conditions, metrics, and richer tests.
+1. Replace list-based CRD loading with watch-driven event queueing and status updates.
+2. Implement the Cloudflare API client and remote diff/application logic.
+3. Add conflict handling, status conditions, metrics, and richer tests.

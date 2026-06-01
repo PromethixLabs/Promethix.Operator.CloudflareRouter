@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: promethix/cloudflare-tunnel-operator
+  tag: latest
+  pullPolicy: IfNotPresent
+
+namespaceOverride: edge-system
+
+serviceAccount:
+  create: true
+  name: ""
+
+cloudflare:
+  existingSecretName: cloudflare-tunnel-operator
+  apiTokenKey: CLOUDFLARE_API_TOKEN
+  accountIdKey: CLOUDFLARE_ACCOUNT_ID
+  tunnelIdKey: CLOUDFLARE_TUNNEL_ID
+
+operator:
+  managedClassName: public
+  managedTunnelName: delta-public
+  ownershipTag: promethix-cloudflare-tunnel-operator
+  applyChanges: false
+  reconciliationIntervalSeconds: 30
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\Modules\Routing\Promethix.CloudflareTunnelOperator.Routing.Application\Promethix.CloudflareTunnelOperator.Routing.Application.csproj" />
     <ProjectReference Include="..\..\Modules\Routing\Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare\Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare.csproj" />
     <ProjectReference Include="..\..\Modules\Routing\Promethix.CloudflareTunnelOperator.Routing.Domain\Promethix.CloudflareTunnelOperator.Routing.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Routing\Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes\Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,0 +1,8 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+rules:
+  - apiGroups: ["edge.promethix.net"]
+    resources: ["tunnelpublichostnames", "tunnelpublichostnames/status", "tunnelpublichostnames/finalizers"]
+    verbs: ["get", "list", "watch", "patch", "update"]

@@ -30,18 +30,21 @@ tests
 The scaffold includes:
 
 - explicit domain types for managed public hostname routes
+- a dedicated `TunnelPublicHostname` CRD contract
+- class-filtered Kubernetes intent loading for a remotely managed tunnel
 - reconciliation planning that respects operator ownership
 - a hosted control loop with health checks and structured logging
 - configuration objects and startup validation
-- a stub Cloudflare adapter and a placeholder Kubernetes intent source
+- a stub Cloudflare adapter and a Kubernetes CRD integration scaffold
 - Docker and Kubernetes deployment assets
+- a starter Helm chart and CRD manifest
 
 The scaffold does not yet implement:
 
-- real CRD models or watch registration
 - live Cloudflare API calls
-- conflict resolution beyond ownership filtering
+- watch-driven event queueing
 - status publishing back into the cluster
+- finalizers and deletion workflows against the Kubernetes API
 
 ## Running Locally
 

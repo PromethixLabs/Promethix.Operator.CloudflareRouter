@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Promethix.CloudflareTunnelOperator.Routing.Application\Promethix.CloudflareTunnelOperator.Routing.Application.csproj" />
+    <ProjectReference Include="..\Promethix.CloudflareTunnelOperator.Routing.Domain\Promethix.CloudflareTunnelOperator.Routing.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="KubernetesClient" Version="19.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

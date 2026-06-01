@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+  namespace: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+    spec:
+      serviceAccountName: {{ include "promethix-cloudflare-tunnel-operator.serviceAccountName" . }}
+      containers:
+        - name: operator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CloudflareTunnel__ApiToken
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.apiTokenKey }}
+            - name: CloudflareTunnel__AccountId
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.accountIdKey }}
+            - name: CloudflareTunnel__TunnelId
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.tunnelIdKey }}
+            - name: KubernetesOperator__ManagedClassName
+              value: {{ .Values.operator.managedClassName | quote }}
+            - name: KubernetesOperator__ManagedTunnelName
+              value: {{ .Values.operator.managedTunnelName | quote }}
+            - name: RoutingOperator__OwnershipTag
+              value: {{ .Values.operator.ownershipTag | quote }}
+            - name: RoutingOperator__ApplyChanges
+              value: {{ .Values.operator.applyChanges | quote }}
+            - name: RoutingOperator__ReconciliationIntervalSeconds
+              value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}

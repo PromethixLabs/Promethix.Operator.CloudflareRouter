@@ -7,6 +7,7 @@ using Promethix.CloudflareTunnelOperator.Hosting.Options;
 using Promethix.CloudflareTunnelOperator.Hosting.Reconciliation;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,10 +23,17 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<CloudflareTunnelOptions>, CloudflareTunnelOptionsValidator>();
 
+builder.Services
+    .AddOptions<KubernetesOperatorOptions>()
+    .Bind(builder.Configuration.GetSection(KubernetesOperatorOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<KubernetesOperatorOptions>, KubernetesOperatorOptionsValidator>();
+
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<RouteReconciler>();
 builder.Services.AddSingleton<OperatorState>();
-builder.Services.AddSingleton<IClusterRouteIntentSource, ClusterRouteIntentSource>();
+builder.Services.AddSingleton(KubernetesClientFactory.Create);
+builder.Services.AddSingleton<IClusterRouteIntentSource, KubernetesRouteIntentSource>();
 builder.Services.AddSingleton<ICloudflareTunnelRouteClient, CloudflareTunnelRouteClient>();
 builder.Services.AddHostedService<OperatorWorker>();
 
