@@ -38,6 +38,8 @@ spec:
               value: {{ .Values.operator.managedClassName | quote }}
             - name: KubernetesOperator__ManagedTunnelName
               value: {{ .Values.operator.managedTunnelName | quote }}
+            - name: KubernetesOperator__ManagedFinalizerName
+              value: {{ .Values.operator.managedFinalizerName | quote }}
             - name: KubernetesOperator__OwnershipConfigMapNamespace
               value: {{ .Values.operator.ownershipConfigMapNamespace | quote }}
             - name: KubernetesOperator__OwnershipConfigMapName

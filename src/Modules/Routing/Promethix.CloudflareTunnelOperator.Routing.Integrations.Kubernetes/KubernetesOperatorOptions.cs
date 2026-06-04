@@ -8,6 +8,8 @@ public sealed class KubernetesOperatorOptions
 
     public string ManagedTunnelName { get; set; } = "delta-public";
 
+    public string ManagedFinalizerName { get; set; } = "edge.promethix.net/tunnelpublichostname-protection";
+
     public string OwnershipConfigMapNamespace { get; set; } = "edge-system";
 
     public string OwnershipConfigMapName { get; set; } = "promethix-cloudflare-tunnel-operator-ownership";

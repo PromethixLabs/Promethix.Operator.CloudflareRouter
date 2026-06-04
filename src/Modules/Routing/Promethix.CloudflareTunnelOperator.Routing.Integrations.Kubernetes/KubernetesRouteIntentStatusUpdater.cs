@@ -1,8 +1,10 @@
 using k8s;
+using k8s.Autorest;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
+using System.Net;
 using System.Text.Json;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
@@ -13,6 +15,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
     IOptions<RoutingOperatorOptions> routingOptions,
     ILogger<KubernetesRouteIntentStatusUpdater> logger) : IRouteIntentStatusUpdater
 {
+    private const int StatusPatchRetryCount = 3;
+
     private static readonly Action<ILogger, string, string, string, Exception?> LogUpdatingStatus =
         LoggerMessage.Define<string, string, string>(
             LogLevel.Information,
@@ -144,14 +148,25 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             JsonSerializer.Serialize(patchDocument),
             V1Patch.PatchType.MergePatch);
 
-        await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
-            patch,
-            TunnelPublicHostnameCustomResource.Group,
-            TunnelPublicHostnameCustomResource.Version,
-            @namespace,
-            TunnelPublicHostnameCustomResource.PluralName,
-            name,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        for (var attempt = 1; attempt <= StatusPatchRetryCount; attempt++)
+        {
+            try
+            {
+                await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
+                    patch,
+                    TunnelPublicHostnameCustomResource.Group,
+                    TunnelPublicHostnameCustomResource.Version,
+                    @namespace,
+                    TunnelPublicHostnameCustomResource.PluralName,
+                    name,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.Conflict && attempt < StatusPatchRetryCount)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private static TunnelPublicHostnameStatus CreateStatus(

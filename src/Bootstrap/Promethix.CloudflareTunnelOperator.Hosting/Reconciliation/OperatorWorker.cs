@@ -1,12 +1,14 @@
 using Microsoft.Extensions.Options;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Hosting.Reconciliation;
 
 internal sealed class OperatorWorker(
     RouteReconciler reconciler,
     IRouteIntentStatusUpdater statusUpdater,
-    ReconciliationSignalQueue signalQueue,
+    KubernetesTunnelPublicHostnameClient resourceClient,
+    RouteIntentWorkQueue workQueue,
     IOptions<RoutingOperatorOptions> options,
     OperatorState state,
     ILogger<OperatorWorker> logger) : BackgroundService
@@ -31,27 +33,31 @@ internal sealed class OperatorWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await RunIterationAsync("startup", stoppingToken).ConfigureAwait(false);
+        workQueue.EnqueueFullResync("startup");
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var triggerReason = await signalQueue
+            var workItem = await workQueue
                 .WaitAsync(TimeSpan.FromSeconds(options.Value.ReconciliationIntervalSeconds), stoppingToken)
                 .ConfigureAwait(false);
 
-            await RunIterationAsync(triggerReason, stoppingToken).ConfigureAwait(false);
+            await RunIterationAsync(workItem, stoppingToken).ConfigureAwait(false);
         }
     }
 
-    private async Task RunIterationAsync(string triggerReason, CancellationToken cancellationToken)
+    private async Task RunIterationAsync(RouteIntentWorkItem workItem, CancellationToken cancellationToken)
     {
-        LogReconciliationTriggered(logger, triggerReason, null);
+        LogReconciliationTriggered(logger, workItem.Reason, null);
 
         try
         {
+            await PrepareLifecycleAsync(workItem, cancellationToken).ConfigureAwait(false);
+
             var result = await reconciler.ReconcileAsync(options.Value, cancellationToken).ConfigureAwait(false);
             state.MarkReconciliationCompleted(result.CompletedAt);
+            await EnsureManagedFinalizersAsync(result, cancellationToken).ConfigureAwait(false);
             await statusUpdater.UpdateAsync(result, failure: null, cancellationToken).ConfigureAwait(false);
+            await FinalizeLifecycleAsync(workItem, cancellationToken).ConfigureAwait(false);
 
             LogReconciliationCompleted(
                 logger,
@@ -77,6 +83,53 @@ internal sealed class OperatorWorker(
 #pragma warning restore CA1031
         {
             LogReconciliationFailed(logger, ex);
+        }
+    }
+
+    private async Task PrepareLifecycleAsync(RouteIntentWorkItem workItem, CancellationToken cancellationToken)
+    {
+        if (workItem.Kind != RouteIntentWorkItemKind.Resource || workItem.ResourceKey is not { } key)
+        {
+            return;
+        }
+
+        var resource = await resourceClient.GetAsync(key, cancellationToken).ConfigureAwait(false);
+
+        if (resource is null || KubernetesTunnelPublicHostnameClient.IsDeleting(resource) || !resourceClient.IsManaged(resource))
+        {
+            return;
+        }
+
+        await resourceClient.EnsureFinalizerAsync(key, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task FinalizeLifecycleAsync(RouteIntentWorkItem workItem, CancellationToken cancellationToken)
+    {
+        if (workItem.Kind != RouteIntentWorkItemKind.Resource || workItem.ResourceKey is not { } key)
+        {
+            return;
+        }
+
+        var resource = await resourceClient.GetAsync(key, cancellationToken).ConfigureAwait(false);
+
+        if (resource is null)
+        {
+            return;
+        }
+
+        if (KubernetesTunnelPublicHostnameClient.IsDeleting(resource) || !resourceClient.IsManaged(resource))
+        {
+            await resourceClient.RemoveFinalizerAsync(key, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task EnsureManagedFinalizersAsync(ReconciliationResult result, CancellationToken cancellationToken)
+    {
+        foreach (var intent in result.Intent.ManagedRoutes)
+        {
+            await resourceClient.EnsureFinalizerAsync(
+                new TunnelPublicHostnameResourceKey(intent.Namespace, intent.Name),
+                cancellationToken).ConfigureAwait(false);
         }
     }
 }

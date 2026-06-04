@@ -1,12 +1,11 @@
 using k8s;
-using k8s.Autorest;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Hosting.Reconciliation;
 
 internal sealed class RouteIntentWatchService(
     IKubernetes kubernetes,
-    ReconciliationSignalQueue signalQueue,
+    RouteIntentWorkQueue workQueue,
     ILogger<RouteIntentWatchService> logger) : BackgroundService
 {
     private static readonly TimeSpan WatchReconnectDelay = TimeSpan.FromSeconds(5);
@@ -41,7 +40,7 @@ internal sealed class RouteIntentWatchService(
 #pragma warning restore CA1031
             {
                 LogWatchError(logger, ex);
-                signalQueue.Request("watch-error");
+                workQueue.EnqueueFullResync("watch-error");
                 await Task.Delay(WatchReconnectDelay, stoppingToken).ConfigureAwait(false);
             }
         }
@@ -68,7 +67,17 @@ internal sealed class RouteIntentWatchService(
             var name = resource.Metadata.Name ?? string.Empty;
 
             LogWatchEvent(logger, eventType.ToString(), @namespace, name, null);
-            signalQueue.Request($"watch:{eventType}");
+
+            if (!string.IsNullOrWhiteSpace(@namespace) && !string.IsNullOrWhiteSpace(name))
+            {
+                workQueue.EnqueueResource(
+                    new TunnelPublicHostnameResourceKey(@namespace, name),
+                    $"watch:{eventType}");
+            }
+            else
+            {
+                workQueue.EnqueueFullResync($"watch:{eventType}");
+            }
         }
     }
 }

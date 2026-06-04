@@ -32,8 +32,9 @@ builder.Services.AddSingleton<IValidateOptions<KubernetesOperatorOptions>, Kuber
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<RouteReconciler>();
 builder.Services.AddSingleton<OperatorState>();
-builder.Services.AddSingleton<ReconciliationSignalQueue>();
+builder.Services.AddSingleton<RouteIntentWorkQueue>();
 builder.Services.AddSingleton(KubernetesClientFactory.Create);
+builder.Services.AddSingleton<KubernetesTunnelPublicHostnameClient>();
 builder.Services.AddSingleton<IClusterRouteIntentSource, KubernetesRouteIntentSource>();
 builder.Services.AddSingleton<IManagedRouteOwnershipStore, KubernetesOwnershipStore>();
 builder.Services.AddSingleton<IRouteIntentStatusUpdater, KubernetesRouteIntentStatusUpdater>();

@@ -21,6 +21,11 @@ internal sealed class KubernetesOperatorOptionsValidator : IValidateOptions<Kube
             failures.Add("KubernetesOperator:ManagedTunnelName is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.ManagedFinalizerName))
+        {
+            failures.Add("KubernetesOperator:ManagedFinalizerName is required.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.OwnershipConfigMapNamespace))
         {
             failures.Add("KubernetesOperator:OwnershipConfigMapNamespace is required.");

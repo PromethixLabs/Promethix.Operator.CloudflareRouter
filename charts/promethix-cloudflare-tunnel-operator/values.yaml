@@ -20,6 +20,7 @@ cloudflare:
 operator:
   managedClassName: public
   managedTunnelName: delta-public
+  managedFinalizerName: edge.promethix.net/tunnelpublichostname-protection
   ownershipTag: promethix-cloudflare-tunnel-operator
   ownershipConfigMapNamespace: edge-system
   ownershipConfigMapName: promethix-cloudflare-tunnel-operator-ownership
