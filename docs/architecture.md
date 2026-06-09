@@ -1,78 +1,232 @@
-# Architecture Notes
+# Architecture
 
-## Intent
+This document covers the parts of the design that matter to operator users and contributors.
 
-The operator is designed as a narrow, explicit control-loop service rather than a broad automation platform. The current focus is safe publication of HTTP/S public hostnames for an existing Cloudflare Tunnel.
+## Purpose
 
-## Main Decisions
+Promethix Cloudflare Tunnel Operator publishes Kubernetes-hosted services through an existing Cloudflare Tunnel.
 
-### Capability-first but pragmatic
+The operator is intentionally narrow in scope:
 
-The solution uses a single `Routing` capability with explicit `Domain`, `Application`, and `Integrations.Cloudflare` projects plus a `Hosting` bootstrap project. That keeps boundaries clear without inventing modules that do not exist yet.
+- it manages Cloudflare Tunnel public hostname entries
+- it does not replace your ingress controller
+- it does not replace `external-dns` or `cert-manager`
 
-### Explicit ownership
+For most HTTP and HTTPS workloads, the operator is designed to work alongside a dedicated Traefik ingress path.
 
-Managed routes carry an ownership marker. Reconciliation only proposes deletion for routes already owned by this operator instance. That creates room for shared-tunnel scenarios and safer rollout.
+## Design principles
 
-### Explicit Kubernetes intent contract
+These principles drive the current design:
 
-Route publication intent lives in a dedicated `TunnelPublicHostname` custom resource rather than annotations on unrelated ingress resources. That keeps tunnel-specific concerns explicit:
+- explicit intent over inference
+- simple control loops over hidden automation
+- clear ownership over shared infrastructure
+- narrow scope over speculative platform-building
 
-- class-based selection
-- tunnel selection
-- target mode selection
-- future direct-target support
-- reconciliation status
+In practice, that means:
 
-The CRD now distinguishes between:
+- tunnel publication intent lives in a dedicated CRD
+- normal HTTP routing stays with `Ingress` and Traefik
+- the operator only deletes what it owns
+- new features should preserve clear boundaries between Kubernetes routing and Cloudflare publication
 
-- `target.mode: ingress`
-  - preferred common-case flow
-  - Cloudflare Tunnel targets a dedicated internal Traefik service
-  - apps still use normal Kubernetes `Ingress`
-- `target.mode: direct`
-  - retained as an escape hatch for workloads that should not traverse Traefik
-  - currently limited to HTTP/S origins
+## Resource model
 
-### Simple reconciliation flow
+The operator watches a custom resource:
 
-The control loop shape is:
+- `TunnelPublicHostname`
+
+This resource is the source of truth for tunnel publication intent.
+
+It currently supports two target modes:
+
+- `ingress`
+  - preferred for normal web workloads
+  - points Cloudflare Tunnel at a Traefik-backed ingress path
+- `direct`
+  - for workloads that should not traverse ingress
+  - currently limited to HTTP and HTTPS origins
+
+## Recommended usage
+
+For most services:
+
+1. Expose the workload with normal Kubernetes `Ingress`
+2. Let Traefik handle routing, middleware, and TLS
+3. Use `TunnelPublicHostname` to publish the hostname through Cloudflare Tunnel
+
+This keeps responsibilities clear:
+
+- Kubernetes `Ingress`: internal routing contract
+- Traefik: middleware, auth, TLS, backend routing
+- Cloudflare Tunnel Operator: public hostname publication
+
+## Ingress-backed mode
+
+Ingress-backed mode is the default operating model.
+
+The operator validates:
+
+- the managed class and tunnel name
+- the ingress class declared in the CRD
+- the optional target service, if specified
+- the existence of a matching Kubernetes `Ingress` for the hostname and ingress class
+
+Ingress-backed targets can be resolved in two ways:
+
+- shared default target from operator configuration
+- explicit service override in the CRD
+
+If the configured ingress target uses HTTPS, the origin certificate must be valid for the target name the operator uses.
+
+## Direct mode
+
+Direct mode is intended for cases where routing through ingress is not appropriate.
+
+Today that means direct HTTP or HTTPS service targets. It exists to preserve flexibility for workloads that do not fit the normal ingress path.
+
+Future non-HTTP support should build on this mode rather than overloading ingress mode.
+
+## Ownership and safety
+
+The operator is designed for shared-tunnel scenarios.
+
+- only routes owned by this operator are eligible for deletion
+- conflicting unmanaged hostnames are surfaced as conflicts, not overwritten
+- dry-run operation is supported through `applyChanges=false`
+
+This is intentional. The operator should be safe to introduce into an existing tunnel without taking ownership of unrelated routes.
+
+## Runtime shape
+
+The operator follows a simple control-loop model:
 
 ```text
-TunnelPublicHostname CRDs -> Kubernetes integration -> route resolution -> application planner -> Cloudflare adapter -> health/logging
+TunnelPublicHostname -> Kubernetes validation -> reconciliation plan -> Cloudflare Tunnel config update
 ```
 
-Ingress-backed mode intentionally narrows responsibility:
+Supporting pieces include:
 
-- Traefik owns HTTP routing, middleware, and certificate termination
-- `external-dns` and `cert-manager` continue using normal ingress annotations
-- the operator owns only Cloudflare Tunnel hostname publication
+- status updates back onto the CRD
+- health endpoints
+- watch-driven reconciliation
+- finalizer-based cleanup
 
-The Kubernetes side reads class-filtered CRD intent for a single managed tunnel and resolves ingress-backed routes to an operator-configured dedicated Traefik target URL.
+## Code layout
 
-Ingress-backed mode supports two resolution paths:
+The code is split into a few focused areas:
 
-- default shared target via `KubernetesOperator:IngressTargetUrl`
-- explicit CRD override via `spec.target.ingress.service`
+- `Routing.Domain`
+  - core route types and invariants
+- `Routing.Application`
+  - reconciliation planning and orchestration
+- `Routing.Integrations.Kubernetes`
+  - CRD loading, validation, status updates, ownership state
+- `Routing.Integrations.Cloudflare`
+  - Cloudflare Tunnel configuration reads and writes
+- `Hosting`
+  - DI, health endpoints, workers, configuration
 
-The CRD-level service override is still constrained by `spec.target.ingress.className`, so the operator keeps a policy boundary around which ingress path may be used for managed tunnel publication.
+## Layering
 
-If that target URL uses HTTPS, the dedicated Traefik origin is expected to present a certificate valid for the configured target name. The operator currently treats that origin URL as authoritative rather than modeling per-hostname SNI overrides.
+The solution follows a modular monolith style.
 
-### Production-minded defaults
+The intent is:
 
-The host includes:
+- keep one deployable service
+- keep module boundaries clear
+- avoid unnecessary abstraction between layers
+- let dependencies flow inward toward domain and application code
 
-- options validation on startup
-- structured logging
-- liveness and readiness endpoints
-- container-oriented `8080` HTTP binding
-- a background reconciliation worker
+For this operator, the current `Routing` module is split into:
 
-## Growth Path
+- `Routing.Domain`
+- `Routing.Application`
+- `Routing.Integrations.Kubernetes`
+- `Routing.Integrations.Cloudflare`
+- `Hosting`
 
-Likely next steps:
+### `Routing.Domain`
 
-1. Validate ingress-backed intents against real Kubernetes `Ingress` resources and ingress class.
-2. Add explicit support for direct TCP or non-HTTP tunnel targets.
-3. Add metrics and richer operational diagnostics around Cloudflare auth and route sync failures.
+This project should contain:
+
+- core domain types
+- invariants and validation that are true regardless of transport or platform
+- value objects and route identity rules
+
+It should not contain:
+
+- Kubernetes client code
+- Cloudflare API code
+- hosting concerns
+
+### `Routing.Application`
+
+This project should contain:
+
+- reconciliation orchestration
+- planning and conflict handling
+- application-facing interfaces
+- use-case level logic that coordinates domain and integrations
+
+It should depend on the domain model, but not on concrete infrastructure details.
+
+### `Routing.Integrations.Kubernetes`
+
+This project should contain:
+
+- CRD models
+- Kubernetes API access
+- intent loading
+- validation against cluster state
+- status updates
+- ownership persistence if Kubernetes-backed
+
+It is the adapter between Kubernetes and the application layer.
+
+### `Routing.Integrations.Cloudflare`
+
+This project should contain:
+
+- Cloudflare API models
+- request and response mapping
+- config merge logic specific to Cloudflare Tunnel
+- write/read behavior for remotely managed tunnel configuration
+
+It should not contain higher-level reconciliation policy beyond what is required to translate application decisions into Cloudflare payloads.
+
+### `Hosting`
+
+This project should contain:
+
+- service startup
+- dependency injection
+- background workers
+- health endpoints
+- configuration binding
+- logging and runtime wiring
+
+This is the composition root. It should stay thin and should not accumulate business logic.
+
+## Contributing notes
+
+If you are changing behavior, keep these boundaries in mind:
+
+- add business rules in `Domain` or `Application`
+- keep Cloudflare-specific payload handling in the Cloudflare integration
+- keep Kubernetes API concerns in the Kubernetes integration
+- avoid pushing policy decisions into the hosting layer
+
+When extending the operator:
+
+- prefer explicit CRD intent over inference
+- preserve safe behavior for shared tunnels
+- avoid broadening scope unless the operator still has a clear ownership boundary
+
+## Current limits
+
+The operator is still under active development. Notable limits today include:
+
+- no direct TCP or non-HTTP origin support yet
+- no advanced per-route Cloudflare origin request settings yet
+- live behavior should still be validated carefully before enabling writes in production

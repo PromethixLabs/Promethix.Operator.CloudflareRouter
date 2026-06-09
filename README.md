@@ -1,15 +1,28 @@
 # Promethix Cloudflare Tunnel Operator
 
-`Promethix.CloudflareTunnelOperator` is a .NET 10 Kubernetes-oriented control-plane service for reconciling cluster-declared public hostname publication intent into Cloudflare Tunnel route configuration.
+Promethix Cloudflare Tunnel Operator is a Kubernetes operator for publishing cluster services through an existing Cloudflare Tunnel.
 
-The current shape focuses on one narrow responsibility:
+The current focus is HTTP and HTTPS public hostname management for remotely managed tunnels. The operator is intended to work with explicit cluster-declared intent, predictable ownership, and safe reconciliation.
 
-- reconcile explicit hostname publication intent
-- target an existing remotely managed Cloudflare Tunnel
-- manage only routes owned by this operator instance
-- stay container-friendly and ready for Kubernetes deployment
+## What it does
 
-## Solution Shape
+- watches `TunnelPublicHostname` resources
+- reconciles public hostnames into Cloudflare Tunnel configuration
+- supports ingress-backed publication through a dedicated Traefik path
+- keeps a direct origin mode for workloads that should not traverse Traefik
+- updates resource status and respects ownership when reconciling shared tunnel config
+
+## Current model
+
+The preferred path is ingress-backed:
+
+- workloads use normal Kubernetes `Ingress`
+- Traefik handles routing, middleware, and TLS
+- the operator publishes the hostname through Cloudflare Tunnel
+
+Direct origin publication is also supported for cases where going through ingress is not appropriate.
+
+## Project layout
 
 ```text
 src
@@ -17,7 +30,8 @@ src
 |   `-- Routing
 |       |-- Promethix.CloudflareTunnelOperator.Routing.Application
 |       |-- Promethix.CloudflareTunnelOperator.Routing.Domain
-|       `-- Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare
+|       |-- Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare
+|       `-- Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes
 `-- Bootstrap
     `-- Promethix.CloudflareTunnelOperator.Hosting
 
@@ -25,45 +39,14 @@ tests
 `-- Promethix.CloudflareTunnelOperator.Routing.Tests
 ```
 
-## Current Scope
-
-The scaffold includes:
-
-- explicit domain types for managed public hostname routes
-- a dedicated `TunnelPublicHostname` CRD contract
-- target modes for ingress-backed publication and direct origin publication
-- class-filtered Kubernetes intent loading for a remotely managed tunnel
-- reconciliation planning that respects operator ownership
-- a watch-driven hosted control loop with health checks and structured logging
-- configuration objects and startup validation
-- a Cloudflare adapter for remotely managed tunnel configuration
-- Docker and Kubernetes deployment assets
-- a starter Helm chart and CRD manifest
-
-The operator currently prefers an ingress-backed model:
-
-- apps continue using normal Kubernetes `Ingress`
-- Traefik remains responsible for middleware, TLS, and backend routing
-- the operator publishes the hostname through Cloudflare Tunnel to a dedicated internal Traefik target
-- when `operator.ingressTargetUrl` uses `https`, the dedicated Traefik origin must present a certificate valid for that origin name
-- ingress-backed CRDs can optionally override the default target with an explicit ingress service reference
-
-The operator still keeps a direct origin mode for workloads that should not traverse Traefik.
-
-The scaffold does not yet implement:
-
-- ingress existence validation against Kubernetes `Ingress` resources
-- direct TCP or non-HTTP tunnel targets
-- metrics and richer operational diagnostics
-
 ## Examples
 
-Starter manifests are in [examples](/c:/Source/Git/Promethix.Operator.CloudflareRouter/examples):
+Example manifests are in [examples](examples):
 
-- [ingress-backed-app.yaml](/c:/Source/Git/Promethix.Operator.CloudflareRouter/examples/ingress-backed-app.yaml)
-- [direct-origin-app.yaml](/c:/Source/Git/Promethix.Operator.CloudflareRouter/examples/direct-origin-app.yaml)
+- [ingress-backed-app.yaml](examples/ingress-backed-app.yaml)
+- [direct-origin-app.yaml](examples/direct-origin-app.yaml)
 
-## Running Locally
+## Development
 
 ```powershell
 dotnet restore
@@ -77,6 +60,12 @@ Health endpoints:
 - `GET /health/live`
 - `GET /health/ready`
 
-## Notes
+## Status
 
-Further architecture notes are in [docs/architecture.md](/c:/Source/Git/Promethix.Operator.CloudfareRouter/docs/architecture.md).
+This project is still under active development. The core reconciliation and Kubernetes integration are in place, but the operator is not yet feature-complete.
+
+Design notes are in [docs/architecture.md](docs/architecture.md).
+
+## License
+
+Licensed under the GNU General Public License v2. See `LICENSE`.
