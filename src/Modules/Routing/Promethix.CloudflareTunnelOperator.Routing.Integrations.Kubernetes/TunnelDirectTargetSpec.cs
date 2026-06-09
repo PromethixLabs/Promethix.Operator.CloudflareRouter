@@ -1,7 +1,6 @@
 namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
-// Compatibility shim for the original v1alpha1 shape.
-public sealed class TunnelOriginSpec
+public sealed class TunnelDirectTargetSpec
 {
     public Uri Url { get; set; } = new("http://localhost");
 

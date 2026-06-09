@@ -8,7 +8,10 @@ public sealed class TunnelPublicHostnameSpec
 
     public TunnelReferenceSpec TunnelRef { get; set; } = new();
 
-    public TunnelOriginSpec Origin { get; set; } = new();
+    public TunnelTargetSpec? Target { get; set; }
+
+    // Compatibility shim for the original v1alpha1 direct-origin shape.
+    public TunnelOriginSpec? Origin { get; set; }
 
     public CloudflareRouteSpec Cloudflare { get; set; } = new();
 

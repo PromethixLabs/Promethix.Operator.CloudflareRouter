@@ -21,6 +21,21 @@ internal sealed class KubernetesOperatorOptionsValidator : IValidateOptions<Kube
             failures.Add("KubernetesOperator:ManagedTunnelName is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.ManagedIngressClassName))
+        {
+            failures.Add("KubernetesOperator:ManagedIngressClassName is required.");
+        }
+
+        if (options.IngressTargetUrl is null)
+        {
+            failures.Add("KubernetesOperator:IngressTargetUrl is required.");
+        }
+        else if (!string.Equals(options.IngressTargetUrl.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                 && !string.Equals(options.IngressTargetUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add("KubernetesOperator:IngressTargetUrl must use http or https.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.ManagedFinalizerName))
         {
             failures.Add("KubernetesOperator:ManagedFinalizerName is required.");

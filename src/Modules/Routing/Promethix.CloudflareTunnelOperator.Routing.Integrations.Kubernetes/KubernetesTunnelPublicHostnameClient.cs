@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
 using Promethix.CloudflareTunnelOperator.Routing.Domain;
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 
@@ -51,7 +52,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
                     resource.Metadata.Name ?? string.Empty,
                     resource.Metadata.NamespaceProperty ?? string.Empty,
                     resource.Metadata.Generation,
-                    ToRoute(resource, routingOptions.Value.OwnershipTag)));
+                    await ToRouteAsync(resource, routingOptions.Value.OwnershipTag, cancellationToken).ConfigureAwait(false)));
             }
             catch (ArgumentException ex)
             {
@@ -140,39 +141,33 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         return string.IsNullOrWhiteSpace(resource.Spec.Hostname) ? null : resource.Spec.Hostname;
     }
 
-    public bool TryBuildIntent(
+    public async Task<(ManagedRouteIntent? ManagedIntent, InvalidRouteIntent? InvalidIntent)> TryBuildIntentAsync(
         TunnelPublicHostnameCustomResource resource,
-        out ManagedRouteIntent? managedIntent,
-        out InvalidRouteIntent? invalidIntent)
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(resource);
 
-        managedIntent = null;
-        invalidIntent = null;
-
         try
         {
-            managedIntent = new ManagedRouteIntent(
+            return (
+                new ManagedRouteIntent(
                 resource.Metadata.Name ?? string.Empty,
                 resource.Metadata.NamespaceProperty ?? string.Empty,
                 resource.Metadata.Generation,
-                ToRoute(resource, routingOptions.Value.OwnershipTag));
-            return true;
+                await ToRouteAsync(resource, routingOptions.Value.OwnershipTag, cancellationToken).ConfigureAwait(false)),
+                null);
         }
         catch (ArgumentException ex)
         {
-            invalidIntent = CreateInvalidIntent(resource, ex.Message);
-            return false;
+            return (null, CreateInvalidIntent(resource, ex.Message));
         }
         catch (InvalidOperationException ex)
         {
-            invalidIntent = CreateInvalidIntent(resource, ex.Message);
-            return false;
+            return (null, CreateInvalidIntent(resource, ex.Message));
         }
         catch (UriFormatException ex)
         {
-            invalidIntent = CreateInvalidIntent(resource, ex.Message);
-            return false;
+            return (null, CreateInvalidIntent(resource, ex.Message));
         }
     }
 
@@ -268,12 +263,6 @@ public sealed class KubernetesTunnelPublicHostnameClient(
             reason);
     }
 
-    private static PublicHostnameRoute ToRoute(TunnelPublicHostnameCustomResource resource, string ownershipTag)
-    {
-        var protocol = ParseProtocol(resource.Spec.Origin.Protocol);
-        return PublicHostnameRoute.Create(resource.Spec.Hostname, resource.Spec.Origin.Url, protocol, ownershipTag);
-    }
-
     private static RouteProtocol ParseProtocol(string protocol)
     {
         if (string.Equals(protocol.Trim(), "http", StringComparison.OrdinalIgnoreCase))
@@ -287,5 +276,172 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         }
 
         throw new InvalidOperationException($"Unsupported origin protocol '{protocol}'.");
+    }
+
+    private async Task<PublicHostnameRoute> ToRouteAsync(
+        TunnelPublicHostnameCustomResource resource,
+        string ownershipTag,
+        CancellationToken cancellationToken)
+    {
+        var target = resource.Spec.Target;
+
+        if (target is null || string.IsNullOrWhiteSpace(target.Mode))
+        {
+            return ToLegacyDirectRoute(resource, ownershipTag);
+        }
+
+        if (string.Equals(target.Mode.Trim(), "ingress", StringComparison.OrdinalIgnoreCase))
+        {
+            return await ToIngressRouteAsync(resource, target, ownershipTag, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (string.Equals(target.Mode.Trim(), "direct", StringComparison.OrdinalIgnoreCase))
+        {
+            return ToDirectRoute(resource, target, ownershipTag);
+        }
+
+        throw new InvalidOperationException($"Unsupported target mode '{target.Mode}'.");
+    }
+
+    private async Task<PublicHostnameRoute> ToIngressRouteAsync(
+        TunnelPublicHostnameCustomResource resource,
+        TunnelTargetSpec target,
+        string ownershipTag,
+        CancellationToken cancellationToken)
+    {
+        var ingress = target.Ingress
+            ?? throw new InvalidOperationException("spec.target.ingress is required when spec.target.mode=ingress.");
+
+        if (string.IsNullOrWhiteSpace(ingress.ClassName))
+        {
+            throw new InvalidOperationException("spec.target.ingress.className is required when spec.target.mode=ingress.");
+        }
+
+        if (!string.Equals(ingress.ClassName, options.Value.ManagedIngressClassName, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Ingress target class '{ingress.ClassName}' does not match managed ingress class '{options.Value.ManagedIngressClassName}'.");
+        }
+
+        await ValidateIngressTargetAsync(resource, ingress, cancellationToken).ConfigureAwait(false);
+
+        var targetUrl = ResolveIngressTargetUrl(ingress);
+        var protocol = string.Equals(targetUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            ? RouteProtocol.Https
+            : RouteProtocol.Http;
+
+        return PublicHostnameRoute.Create(resource.Spec.Hostname, targetUrl, protocol, ownershipTag);
+    }
+
+    private static PublicHostnameRoute ToDirectRoute(
+        TunnelPublicHostnameCustomResource resource,
+        TunnelTargetSpec target,
+        string ownershipTag)
+    {
+        var direct = target.Direct
+            ?? throw new InvalidOperationException("spec.target.direct is required when spec.target.mode=direct.");
+
+        var protocol = ParseProtocol(direct.Protocol);
+        return PublicHostnameRoute.Create(resource.Spec.Hostname, direct.Url, protocol, ownershipTag);
+    }
+
+    private static PublicHostnameRoute ToLegacyDirectRoute(
+        TunnelPublicHostnameCustomResource resource,
+        string ownershipTag)
+    {
+        var origin = resource.Spec.Origin
+            ?? throw new InvalidOperationException("spec.origin is required when spec.target is not supplied.");
+
+        var protocol = ParseProtocol(origin.Protocol);
+        return PublicHostnameRoute.Create(resource.Spec.Hostname, origin.Url, protocol, ownershipTag);
+    }
+
+    private Uri ResolveIngressTargetUrl(TunnelIngressTargetSpec ingress)
+    {
+        if (ingress.Service is null)
+        {
+            return options.Value.IngressTargetUrl;
+        }
+
+        if (string.IsNullOrWhiteSpace(ingress.Service.Name))
+        {
+            throw new InvalidOperationException("spec.target.ingress.service.name is required when spec.target.ingress.service is supplied.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ingress.Service.Namespace))
+        {
+            throw new InvalidOperationException("spec.target.ingress.service.namespace is required when spec.target.ingress.service is supplied.");
+        }
+
+        if (ingress.Service.Port <= 0)
+        {
+            throw new InvalidOperationException("spec.target.ingress.service.port must be greater than zero when spec.target.ingress.service is supplied.");
+        }
+
+        var scheme = ingress.Service.Scheme?.Trim();
+        if (!string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("spec.target.ingress.service.scheme must be http or https when spec.target.ingress.service is supplied.");
+        }
+
+        return new Uri($"{scheme}://{ingress.Service.Name}.{ingress.Service.Namespace}.svc.cluster.local:{ingress.Service.Port}");
+    }
+
+    private async Task ValidateIngressTargetAsync(
+        TunnelPublicHostnameCustomResource resource,
+        TunnelIngressTargetSpec ingress,
+        CancellationToken cancellationToken)
+    {
+        var serviceNamespace = ingress.Service?.Namespace;
+        var serviceName = ingress.Service?.Name;
+        var servicePort = ingress.Service?.Port ?? 0;
+
+        if (!string.IsNullOrWhiteSpace(serviceNamespace) && !string.IsNullOrWhiteSpace(serviceName))
+        {
+            V1Service service;
+            try
+            {
+                service = await kubernetes.CoreV1.ReadNamespacedServiceAsync(
+                    serviceName,
+                    serviceNamespace,
+                    pretty: null,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new InvalidOperationException(
+                    $"Referenced ingress service {serviceNamespace}/{serviceName} does not exist.",
+                    ex);
+            }
+
+            var portExists = service.Spec?.Ports?.Any(port =>
+                port.Port == servicePort ||
+                string.Equals(
+                    port.TargetPort?.ToString(),
+                    servicePort.ToString(CultureInfo.InvariantCulture),
+                    StringComparison.Ordinal)) == true;
+            if (!portExists)
+            {
+                throw new InvalidOperationException(
+                    $"Referenced ingress service {serviceNamespace}/{serviceName} does not expose port {servicePort}.");
+            }
+        }
+
+        var ingresses = await kubernetes.NetworkingV1.ListIngressForAllNamespacesAsync(
+            allowWatchBookmarks: false,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var hostname = resource.Spec.Hostname.Trim();
+        var className = ingress.ClassName.Trim();
+        var matchExists = ingresses.Items.Any(item =>
+            string.Equals(item.Spec?.IngressClassName, className, StringComparison.Ordinal)
+            && item.Spec?.Rules?.Any(rule => string.Equals(rule.Host, hostname, StringComparison.OrdinalIgnoreCase)) == true);
+
+        if (!matchExists)
+        {
+            throw new InvalidOperationException(
+                $"No Kubernetes Ingress with class '{className}' publishes hostname '{hostname}'.");
+        }
     }
 }

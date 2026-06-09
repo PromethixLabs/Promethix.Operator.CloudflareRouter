@@ -1,19 +1,19 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: promethix-system
+  name: edge-system
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: promethix-cloudflare-tunnel-operator
-  namespace: promethix-system
+  namespace: edge-system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: promethix-cloudflare-tunnel-operator
-  namespace: promethix-system
+  namespace: edge-system
 spec:
   replicas: 1
   selector:
@@ -44,6 +44,24 @@ spec:
                   key: api-token
             - name: RoutingOperator__OwnershipTag
               value: promethix-cloudflare-tunnel-operator
+            - name: KubernetesOperator__ManagedClassName
+              value: public
+            - name: KubernetesOperator__ManagedTunnelName
+              value: delta-public
+            - name: KubernetesOperator__ManagedIngressClassName
+              value: traefik-cloudflare-tunnel
+            - name: KubernetesOperator__IngressTargetUrl
+              value: https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local
+            - name: KubernetesOperator__ManagedFinalizerName
+              value: edge.promethix.net/tunnelpublichostname-protection
+            - name: KubernetesOperator__OwnershipConfigMapNamespace
+              value: edge-system
+            - name: KubernetesOperator__OwnershipConfigMapName
+              value: promethix-cloudflare-tunnel-operator-ownership
+            - name: RoutingOperator__ApplyChanges
+              value: "false"
+            - name: RoutingOperator__ReconciliationIntervalSeconds
+              value: "30"
           readinessProbe:
             httpGet:
               path: /health/ready

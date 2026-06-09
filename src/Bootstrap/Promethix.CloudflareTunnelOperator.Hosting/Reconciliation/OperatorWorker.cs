@@ -117,18 +117,17 @@ internal sealed class OperatorWorker(
 
         await resourceClient.EnsureFinalizerAsync(key, cancellationToken).ConfigureAwait(false);
 
-        if (!resourceClient.TryBuildIntent(resource, out var managedIntent, out var invalidIntent))
+        var (managedIntent, invalidIntent) = await resourceClient
+            .TryBuildIntentAsync(resource, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (managedIntent is null)
         {
             if (invalidIntent is not null)
             {
                 await statusUpdater.UpdateInvalidAsync(invalidIntent, cancellationToken).ConfigureAwait(false);
             }
 
-            return;
-        }
-
-        if (managedIntent is null)
-        {
             return;
         }
 

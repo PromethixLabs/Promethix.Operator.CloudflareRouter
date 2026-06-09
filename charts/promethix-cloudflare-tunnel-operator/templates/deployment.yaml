@@ -38,6 +38,10 @@ spec:
               value: {{ .Values.operator.managedClassName | quote }}
             - name: KubernetesOperator__ManagedTunnelName
               value: {{ .Values.operator.managedTunnelName | quote }}
+            - name: KubernetesOperator__ManagedIngressClassName
+              value: {{ .Values.operator.managedIngressClassName | quote }}
+            - name: KubernetesOperator__IngressTargetUrl
+              value: {{ .Values.operator.ingressTargetUrl | quote }}
             - name: KubernetesOperator__ManagedFinalizerName
               value: {{ .Values.operator.managedFinalizerName | quote }}
             - name: KubernetesOperator__OwnershipConfigMapNamespace
