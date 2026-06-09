@@ -1,5 +1,6 @@
 using k8s.Models;
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
@@ -15,5 +16,6 @@ public sealed class TunnelPublicHostnameCustomResourceList
     public V1ListMeta Metadata { get; set; } = new();
 
     [JsonPropertyName("items")]
-    public IList<TunnelPublicHostnameCustomResource> Items { get; } = [];
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Setter required for Kubernetes custom resource list deserialization.")]
+    public IList<TunnelPublicHostnameCustomResource> Items { get; set; } = [];
 }

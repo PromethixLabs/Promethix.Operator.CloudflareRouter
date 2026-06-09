@@ -15,6 +15,7 @@ public sealed class KubernetesRouteIntentStatusUpdater(
     IOptions<RoutingOperatorOptions> routingOptions,
     ILogger<KubernetesRouteIntentStatusUpdater> logger) : IRouteIntentStatusUpdater
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const int StatusPatchRetryCount = 3;
 
     private static readonly Action<ILogger, string, string, string, Exception?> LogUpdatingStatus =
@@ -184,11 +185,26 @@ public sealed class KubernetesRouteIntentStatusUpdater(
 
         var patchDocument = new
         {
-            status,
+            status = new
+            {
+                observedGeneration = status.ObservedGeneration,
+                ownershipTag = status.OwnershipTag,
+                appliedTunnelName = status.AppliedTunnelName,
+                appliedHostname = status.AppliedHostname,
+                conditions = status.Conditions.Select(condition => new
+                {
+                    type = condition.Type,
+                    status = condition.Status,
+                    reason = condition.Reason,
+                    message = condition.Message,
+                    lastTransitionTime = condition.LastTransitionTime,
+                    observedGeneration = condition.ObservedGeneration,
+                }).ToArray(),
+            },
         };
 
         var patch = new V1Patch(
-            JsonSerializer.Serialize(patchDocument),
+            JsonSerializer.Serialize(patchDocument, JsonOptions),
             V1Patch.PatchType.MergePatch);
 
         for (var attempt = 1; attempt <= StatusPatchRetryCount; attempt++)
