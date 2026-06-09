@@ -120,6 +120,7 @@ public static class RoutePlanner
     {
         return string.Equals(left.Hostname, right.Hostname, StringComparison.OrdinalIgnoreCase)
             && left.Protocol == right.Protocol
-            && left.OriginService == right.OriginService;
+            && left.OriginService == right.OriginService
+            && string.Equals(left.OriginServerName, right.OriginServerName, StringComparison.OrdinalIgnoreCase);
     }
 }

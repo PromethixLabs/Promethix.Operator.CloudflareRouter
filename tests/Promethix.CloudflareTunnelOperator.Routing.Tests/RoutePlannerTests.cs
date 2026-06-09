@@ -78,6 +78,63 @@ public sealed class RoutePlannerTests
     }
 
     [Fact]
+    public void BuildPlanShouldUpdateOwnedRouteWhenOriginServerNameDiffers()
+    {
+        var desired = new[]
+        {
+            PublicHostnameRoute.Create(
+                "whoami.promethix.net",
+                new Uri("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local"),
+                RouteProtocol.Https,
+                OwnershipTag,
+                "whoami.promethix.net"),
+        };
+
+        var actual = new[]
+        {
+            PublicHostnameRoute.Create(
+                "whoami.promethix.net",
+                new Uri("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local"),
+                RouteProtocol.Https,
+                OwnershipTag),
+        };
+
+        var plan = RoutePlanner.BuildPlan(desired, actual, OwnershipTag);
+
+        plan.ToUpdate.Should().ContainSingle();
+        plan.ToCreate.Should().BeEmpty();
+        plan.ToDelete.Should().BeEmpty();
+        plan.Conflicts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void BuildManagePlanShouldUpdateOwnedRouteWhenOriginServerNameDiffers()
+    {
+        var desired = PublicHostnameRoute.Create(
+            "whoami.promethix.net",
+            new Uri("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local"),
+            RouteProtocol.Https,
+            OwnershipTag,
+            "whoami.promethix.net");
+
+        var actual = new[]
+        {
+            PublicHostnameRoute.Create(
+                "whoami.promethix.net",
+                new Uri("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local"),
+                RouteProtocol.Https,
+                OwnershipTag),
+        };
+
+        var plan = RoutePlanner.BuildManagePlan(desired, actual, OwnershipTag);
+
+        plan.ToUpdate.Should().ContainSingle();
+        plan.ToCreate.Should().BeEmpty();
+        plan.ToDelete.Should().BeEmpty();
+        plan.Conflicts.Should().BeEmpty();
+    }
+
+    [Fact]
     public void BuildCleanupPlanShouldDeleteOnlyOwnedMatchingHostname()
     {
         var actual = new[]
