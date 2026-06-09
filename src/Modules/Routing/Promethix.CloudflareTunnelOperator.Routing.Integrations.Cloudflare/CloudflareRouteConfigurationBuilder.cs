@@ -86,7 +86,20 @@ internal static class CloudflareRouteConfigurationBuilder
         return new TunnelIngressRule
         {
             Hostname = route.Hostname,
-            Service = route.OriginService.ToString(),
+            Service = FormatServiceUrl(route.OriginService),
         };
+    }
+
+    private static string FormatServiceUrl(Uri originService)
+    {
+        if (originService.IsAbsoluteUri
+            && string.IsNullOrEmpty(originService.Query)
+            && string.IsNullOrEmpty(originService.Fragment)
+            && string.Equals(originService.AbsolutePath, "/", StringComparison.Ordinal))
+        {
+            return originService.GetLeftPart(UriPartial.Authority);
+        }
+
+        return originService.ToString();
     }
 }

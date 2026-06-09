@@ -27,6 +27,12 @@ public sealed class CloudflareTunnelRouteClient(
             new EventId(1001, nameof(ApplyAsync)),
             "Applying Cloudflare route plan: create {CreateCount}, update {UpdateCount}, delete {DeleteCount}.");
 
+    private static readonly Action<ILogger, int, string, Exception?> LogCloudflareWriteRejected =
+        LoggerMessage.Define<int, string>(
+            LogLevel.Error,
+            new EventId(1002, "CloudflareWriteRejected"),
+            "Cloudflare rejected tunnel configuration update with status {StatusCode}. Response body: {ResponseBody}");
+
     public async Task<IReadOnlyCollection<PublicHostnameRoute>> GetRoutesAsync(CancellationToken cancellationToken)
     {
         LogReadingRoutes(logger, options.Value.TunnelId, options.Value.AccountId, null);
@@ -133,6 +139,13 @@ public sealed class CloudflareTunnelRouteClient(
             JsonOptions,
             cancellationToken).ConfigureAwait(false);
 
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        LogCloudflareWriteRejected(logger, (int)response.StatusCode, responseBody, null);
         response.EnsureSuccessStatusCode();
     }
 }

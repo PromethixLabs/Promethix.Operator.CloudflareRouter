@@ -58,8 +58,8 @@ public sealed class CloudflareRouteConfigurationBuilderTests
         var rebuilt = CloudflareRouteConfigurationBuilder.Build(currentConfiguration, plan, ownership, OwnershipTag);
 
         rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "manual.promethix.net" && rule.Service == "https://manual.default.svc.cluster.local:8443");
-        rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "managed.promethix.net" && rule.Service == "https://new.default.svc.cluster.local:8443/");
-        rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "created.promethix.net" && rule.Service == "http://created.default.svc.cluster.local:8080/");
+        rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "managed.promethix.net" && rule.Service == "https://new.default.svc.cluster.local:8443");
+        rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "created.promethix.net" && rule.Service == "http://created.default.svc.cluster.local:8080");
         rebuilt.Ingress.Should().ContainSingle(rule => string.IsNullOrWhiteSpace(rule.Hostname) && rule.Service == "http_status:404");
     }
 }
