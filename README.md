@@ -1,5 +1,7 @@
 # Promethix Cloudflare Tunnel Operator
 
+[![Build Status](https://drone.promethix.net/api/badges/gentoorax/Promethix.Operator.CloudflareRouter/status.svg)](https://drone.promethix.net/gentoorax/Promethix.Operator.CloudflareRouter)
+
 Promethix Cloudflare Tunnel Operator is a Kubernetes operator for publishing cluster services through an existing Cloudflare Tunnel.
 
 The current focus is HTTP and HTTPS public hostname management for remotely managed tunnels. The operator is intended to work with explicit cluster-declared intent, predictable ownership, and safe reconciliation.
