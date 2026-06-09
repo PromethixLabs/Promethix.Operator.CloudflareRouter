@@ -9,4 +9,8 @@ internal sealed class TunnelIngressRule
 
     [JsonPropertyName("service")]
     public string Service { get; set; } = string.Empty;
+
+    [JsonPropertyName("originRequest")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TunnelOriginRequest? OriginRequest { get; set; }
 }

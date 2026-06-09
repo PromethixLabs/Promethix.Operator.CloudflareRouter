@@ -77,7 +77,8 @@ Ingress-backed targets can be resolved in two ways:
 - shared default target from operator configuration
 - explicit service override in the CRD
 
-If the configured ingress target uses HTTPS, the origin certificate must be valid for the target name the operator uses.
+If the configured ingress target uses HTTPS, the operator emits Cloudflare `originRequest.originServerName` using the public hostname from `TunnelPublicHostname.spec.hostname`.
+This allows cloudflared to verify the Traefik certificate against the public host name rather than the Kubernetes service DNS name used for the internal origin connection.
 
 ## Direct mode
 

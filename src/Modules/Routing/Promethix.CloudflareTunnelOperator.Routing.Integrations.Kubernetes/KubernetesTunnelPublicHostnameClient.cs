@@ -329,8 +329,11 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         var protocol = string.Equals(targetUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
             ? RouteProtocol.Https
             : RouteProtocol.Http;
+        var originServerName = protocol == RouteProtocol.Https
+            ? resource.Spec.Hostname
+            : null;
 
-        return PublicHostnameRoute.Create(resource.Spec.Hostname, targetUrl, protocol, ownershipTag);
+        return PublicHostnameRoute.Create(resource.Spec.Hostname, targetUrl, protocol, ownershipTag, originServerName);
     }
 
     private static PublicHostnameRoute ToDirectRoute(

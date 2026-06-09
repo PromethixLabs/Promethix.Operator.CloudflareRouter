@@ -21,6 +21,7 @@ The preferred path is ingress-backed:
 - workloads use normal Kubernetes `Ingress`
 - Traefik handles routing, middleware, and TLS
 - the operator publishes the hostname through Cloudflare Tunnel
+- for HTTPS ingress targets, the operator sets Cloudflare `originRequest.originServerName` to the public hostname so cloudflared can verify the Traefik certificate correctly
 
 Direct origin publication is also supported for cases where going through ingress is not appropriate.
 

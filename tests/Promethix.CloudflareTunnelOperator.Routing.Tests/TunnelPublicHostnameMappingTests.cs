@@ -115,6 +115,7 @@ public sealed class TunnelPublicHostnameMappingTests
         invalidIntent.Should().BeNull();
         managedIntent.Should().NotBeNull();
         managedIntent!.Route.OriginService.Should().Be(new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443"));
+        managedIntent.Route.OriginServerName.Should().Be("whoami.delta.promethix.net");
     }
 
     private sealed class AcceptingIngressTargetValidator : IIngressTargetValidator

@@ -62,4 +62,80 @@ public sealed class CloudflareRouteConfigurationBuilderTests
         rebuilt.Ingress.Should().Contain(rule => rule.Hostname == "created.promethix.net" && rule.Service == "http://created.default.svc.cluster.local:8080");
         rebuilt.Ingress.Should().ContainSingle(rule => string.IsNullOrWhiteSpace(rule.Hostname) && rule.Service == "http_status:404");
     }
+
+    [Fact]
+    public void BuildShouldEmitOriginServerNameForHttpsManagedIngressRoutes()
+    {
+        var currentConfiguration = new TunnelConfiguration
+        {
+            Ingress =
+            [
+                new TunnelIngressRule
+                {
+                    Service = "http_status:404",
+                },
+            ],
+        };
+
+        var createdManagedRoute = PublicHostnameRoute.Create(
+            "whoami.promethix.net",
+            new Uri("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local:443"),
+            RouteProtocol.Https,
+            OwnershipTag,
+            "whoami.promethix.net");
+
+        var plan = new RoutePlan(
+            ToCreate: [createdManagedRoute],
+            ToUpdate: [],
+            ToDelete: [],
+            Conflicts: []);
+
+        var rebuilt = CloudflareRouteConfigurationBuilder.Build(
+            currentConfiguration,
+            plan,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            OwnershipTag);
+
+        var route = rebuilt.Ingress.Single(rule => rule.Hostname == "whoami.promethix.net");
+        route.Service.Should().Be("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local:443");
+        route.OriginRequest.Should().NotBeNull();
+        route.OriginRequest!.OriginServerName.Should().Be("whoami.promethix.net");
+    }
+
+    [Fact]
+    public void BuildShouldNotEmitOriginServerNameForHttpRoutes()
+    {
+        var currentConfiguration = new TunnelConfiguration
+        {
+            Ingress =
+            [
+                new TunnelIngressRule
+                {
+                    Service = "http_status:404",
+                },
+            ],
+        };
+
+        var createdManagedRoute = PublicHostnameRoute.Create(
+            "whoami.promethix.net",
+            new Uri("http://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local:80"),
+            RouteProtocol.Http,
+            OwnershipTag);
+
+        var plan = new RoutePlan(
+            ToCreate: [createdManagedRoute],
+            ToUpdate: [],
+            ToDelete: [],
+            Conflicts: []);
+
+        var rebuilt = CloudflareRouteConfigurationBuilder.Build(
+            currentConfiguration,
+            plan,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            OwnershipTag);
+
+        var route = rebuilt.Ingress.Single(rule => rule.Hostname == "whoami.promethix.net");
+        route.Service.Should().Be("http://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local:80");
+        route.OriginRequest.Should().BeNull();
+    }
 }

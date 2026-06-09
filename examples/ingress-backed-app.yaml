@@ -80,5 +80,7 @@ spec:
         namespace: edge-system
         port: 443
         scheme: https
+      # The operator will emit originRequest.originServerName=whoami.delta.promethix.net
+      # so cloudflared verifies the Traefik certificate against the public hostname.
   cloudflare:
     proxied: true

@@ -105,7 +105,12 @@ public sealed class CloudflareTunnelRouteClient(
             ? value
             : "external";
 
-        return PublicHostnameRoute.Create(rule.Hostname!, originService, protocol, ownershipTag);
+        return PublicHostnameRoute.Create(
+            rule.Hostname!,
+            originService,
+            protocol,
+            ownershipTag,
+            rule.OriginRequest?.OriginServerName);
     }
 
     private async Task<TunnelConfiguration> GetConfigurationAsync(string accountId, string tunnelId, CancellationToken cancellationToken)

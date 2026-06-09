@@ -87,6 +87,12 @@ internal static class CloudflareRouteConfigurationBuilder
         {
             Hostname = route.Hostname,
             Service = FormatServiceUrl(route.OriginService),
+            OriginRequest = string.IsNullOrWhiteSpace(route.OriginServerName)
+                ? null
+                : new TunnelOriginRequest
+                {
+                    OriginServerName = route.OriginServerName,
+                },
         };
     }
 
