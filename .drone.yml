@@ -64,8 +64,44 @@ trigger:
     - refs/heads/main
 
 steps:
+  - name: restore
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_NOLOGO: "1"
+      NUGET_PACKAGES: /drone/src/.nuget/packages
+    commands:
+      - dotnet restore Promethix.CloudflareTunnelOperator.slnx
+
+  - name: build
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    depends_on:
+      - restore
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_NOLOGO: "1"
+      NUGET_PACKAGES: /drone/src/.nuget/packages
+    commands:
+      - dotnet build Promethix.CloudflareTunnelOperator.slnx --configuration Release --no-restore
+
+  - name: test
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    depends_on:
+      - build
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_NOLOGO: "1"
+      NUGET_PACKAGES: /drone/src/.nuget/packages
+    commands:
+      - dotnet test Promethix.CloudflareTunnelOperator.slnx --configuration Release --no-build --logger "trx;LogFileName=tests.trx"
+
   - name: calculate-build-metadata
     image: alpine:3.21
+    depends_on:
+      - test
     commands:
       - 'mkdir -p .drone; if [ -f .drone/version-prefix.env ]; then . .drone/version-prefix.env; fi; buildMajor="$${VERSION_MAJOR:-0}"; buildMinor="$${VERSION_MINOR:-1}"; buildRevision="$${VERSION_REVISION:-0}"; buildNumber="$${DRONE_BUILD_NUMBER:-0}"; buildSemver="$${buildMajor}.$${buildMinor}.$${buildRevision}"; stagingTag="$${buildSemver}-staging.$${buildNumber}"; releaseTag="$${buildSemver}.$${buildNumber}"; shortCommit="$(printf "%.12s" "$${DRONE_COMMIT_SHA}")"; buildDisplay="v$${buildSemver}"; buildDate="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; imageRepo="harbor.internal.promethix.net/promethix/cloudflare-tunnel-operator"; directProductionRelease="$${DIRECT_PRODUCTION_RELEASE:-false}"; printf "BUILD_MAJOR=%s\nBUILD_MINOR=%s\nBUILD_REVISION=%s\nBUILD_NUMBER=%s\nBUILD_SEMVER=%s\nSTAGING_TAG=%s\nRELEASE_TAG=%s\nSHORT_COMMIT=%s\nBUILD_DISPLAY=%s\nBUILD_DATE=%s\nIMAGE_REPO=%s\nDIRECT_PRODUCTION_RELEASE=%s\n" "$${buildMajor}" "$${buildMinor}" "$${buildRevision}" "$${buildNumber}" "$${buildSemver}" "$${stagingTag}" "$${releaseTag}" "$${shortCommit}" "$${buildDisplay}" "$${buildDate}" "$${imageRepo}" "$${directProductionRelease}" > .drone/build.env'
 
