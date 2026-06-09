@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using k8s;
 using Promethix.CloudflareTunnelOperator.Hosting;
 using Promethix.CloudflareTunnelOperator.Hosting.Health;
 using Promethix.CloudflareTunnelOperator.Hosting.Options;
@@ -33,7 +34,7 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<RouteReconciler>();
 builder.Services.AddSingleton<OperatorState>();
 builder.Services.AddSingleton<RouteIntentWorkQueue>();
-builder.Services.AddSingleton(KubernetesClientFactory.Create);
+builder.Services.AddSingleton<IKubernetes>(_ => KubernetesClientFactory.Create());
 builder.Services.AddSingleton<KubernetesTunnelPublicHostnameClient>();
 builder.Services.AddSingleton<IClusterRouteIntentSource, KubernetesRouteIntentSource>();
 builder.Services.AddSingleton<IManagedRouteOwnershipStore, KubernetesOwnershipStore>();
