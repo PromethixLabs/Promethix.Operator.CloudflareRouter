@@ -171,13 +171,15 @@ steps:
       - resolve-published-image-digests
     commands:
       - 'apk add --no-cache jq'
-      - '. .drone/build.env; . .drone/digests.env; mkdir -p .drone/attestations; harborSha="$${HARBOR_IMAGE_DIGEST#sha256:}"; jq -n --arg repo "$${DRONE_REPO}" --arg commit "$${DRONE_COMMIT_SHA}" --arg version "$${STAGING_TAG}" --arg buildNumber "$${DRONE_BUILD_NUMBER}" --arg buildUrl "$${DRONE_BUILD_LINK}" --arg workflow "$${DRONE_STAGE_NAME:-image-publish-staging}" --arg builder "drone.promethix.net/$${DRONE_REPO}" --arg image "$${HARBOR_IMAGE_REPO}" --arg digest "$${HARBOR_IMAGE_DIGEST}" --arg sha "$${harborSha}" "{buildDefinition:{buildType:\"https://drone.io/pipeline\",externalParameters:{repository:$repo,commit:$commit,version:$version,droneBuildNumber:$buildNumber,droneBuildUrl:$buildUrl,pipeline:$workflow,builderIdentity:$builder,imageDigest:$digest},internalParameters:{}},runDetails:{builder:{id:$builder},metadata:{invocationId:$buildNumber,startedOn:null,finishedOn:null}},subject:[{name:$image,digest:{sha256:$sha}}]}" > .drone/attestations/provenance.slsa.json'
+      - '. .drone/build.env; . .drone/digests.env; mkdir -p .drone/attestations; harborSha="$${HARBOR_IMAGE_DIGEST#sha256:}"; jq -n --arg repo "$${DRONE_REPO}" --arg commit "$${DRONE_COMMIT_SHA}" --arg version "$${STAGING_TAG}" --arg buildNumber "$${DRONE_BUILD_NUMBER}" --arg buildUrl "$${DRONE_BUILD_LINK}" --arg workflow "$${DRONE_STAGE_NAME:-image-publish-staging}" --arg builder "drone.promethix.net/$${DRONE_REPO}" --arg image "$${HARBOR_IMAGE_REPO}" --arg digest "$${HARBOR_IMAGE_DIGEST}" --arg sha "$${harborSha}" "{buildDefinition:{buildType:\"https://drone.io/pipeline\",externalParameters:{repository:\$repo,commit:\$commit,version:\$version,droneBuildNumber:\$buildNumber,droneBuildUrl:\$buildUrl,pipeline:\$workflow,builderIdentity:\$builder,imageDigest:\$digest},internalParameters:{}},runDetails:{builder:{id:\$builder},metadata:{invocationId:\$buildNumber,startedOn:null,finishedOn:null}},subject:[{name:\$image,digest:{sha256:\$sha}}]}" > .drone/attestations/provenance.slsa.json'
 
   - name: generate-sbom
-    image: anchore/syft:v1.20.0-debug
+    image: alpine:3.21
     depends_on:
       - resolve-published-image-digests
     commands:
+      - 'apk add --no-cache ca-certificates curl'
+      - 'curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.20.0/install.sh | sh -s -- -b /usr/local/bin v1.20.0'
       - 'mkdir -p .drone/attestations'
       - 'syft dir:. -o spdx-json=.drone/attestations/sbom.spdx.json'
 
