@@ -32,9 +32,9 @@ public sealed class KubernetesOwnershipStore(
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             return configMap.Data is null || !configMap.Data.TryGetValue(OwnershipDataKey, out var json) || string.IsNullOrWhiteSpace(json)
-                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                ? []
                 : JsonSerializer.Deserialize<Dictionary<string, string>>(json)
-                ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                ?? [];
         }
         catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
         {
