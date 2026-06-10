@@ -98,8 +98,8 @@ public sealed class CloudflareRouteConfigurationBuilderTests
 
         var route = rebuilt.Ingress.Single(rule => rule.Hostname == "whoami.promethix.net");
         _ = route.Service.Should().Be("https://traefik-cloudflare-tunnel.traefik-cloudflare-tunnel.svc.cluster.local");
-        _ = route.OriginRequest.Should().NotBeNull();
-        _ = route.OriginRequest!.OriginServerName.Should().Be("whoami.promethix.net");
+        Assert.NotNull(route.OriginRequest);
+        _ = route.OriginRequest.OriginServerName.Should().Be("whoami.promethix.net");
     }
 
     [Fact]

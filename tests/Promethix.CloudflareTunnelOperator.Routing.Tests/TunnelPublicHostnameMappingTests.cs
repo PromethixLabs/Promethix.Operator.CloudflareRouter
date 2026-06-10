@@ -35,7 +35,8 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = resource.Spec.Cloudflare.Proxied.Should().BeTrue();
         _ = resource.Spec.TunnelRef.Name.Should().Be("delta-public");
         _ = resource.Spec.Target.Mode.Should().Be("ingress");
-        _ = resource.Spec.Target.Ingress!.ClassName.Should().Be("traefik-cloudflare-tunnel");
+        Assert.NotNull(resource.Spec.Target.Ingress);
+        _ = resource.Spec.Target.Ingress.ClassName.Should().Be("traefik-cloudflare-tunnel");
     }
 
     [Fact]
