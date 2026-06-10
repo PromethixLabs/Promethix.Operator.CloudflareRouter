@@ -8,7 +8,7 @@ internal sealed class OperatorState
 
     public void MarkReconciliationCompleted(DateTimeOffset completedAtUtc)
     {
-        this.HasCompletedInitialReconciliation = true;
-        this.LastCompletedAtUtc = completedAtUtc;
+        HasCompletedInitialReconciliation = true;
+        LastCompletedAtUtc = completedAtUtc;
     }
 }

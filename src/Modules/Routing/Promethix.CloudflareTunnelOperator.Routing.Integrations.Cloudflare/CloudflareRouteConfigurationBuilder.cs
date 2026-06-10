@@ -48,7 +48,7 @@ internal static class CloudflareRouteConfigurationBuilder
             if (updateRoutes.TryGetValue(existingRule.Hostname, out var updateRoute))
             {
                 ingress.Add(ToIngressRule(updateRoute));
-                updateRoutes.Remove(existingRule.Hostname);
+                _ = updateRoutes.Remove(existingRule.Hostname);
                 continue;
             }
 
@@ -98,14 +98,11 @@ internal static class CloudflareRouteConfigurationBuilder
 
     private static string FormatServiceUrl(Uri originService)
     {
-        if (originService.IsAbsoluteUri
+        return originService.IsAbsoluteUri
             && string.IsNullOrEmpty(originService.Query)
             && string.IsNullOrEmpty(originService.Fragment)
-            && string.Equals(originService.AbsolutePath, "/", StringComparison.Ordinal))
-        {
-            return originService.GetLeftPart(UriPartial.Authority);
-        }
-
-        return originService.ToString();
+            && string.Equals(originService.AbsolutePath, "/", StringComparison.Ordinal)
+            ? originService.GetLeftPart(UriPartial.Authority)
+            : originService.ToString();
     }
 }

@@ -10,6 +10,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' Or '$(DRONE)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
 </Project>

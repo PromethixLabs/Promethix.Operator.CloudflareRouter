@@ -73,27 +73,15 @@ public static class RoutePlanner
         var actual = actualRoutes.FirstOrDefault(
             route => string.Equals(route.Hostname, desiredRoute.Hostname, StringComparison.OrdinalIgnoreCase));
 
-        if (actual is null)
-        {
-            return new RoutePlan([desiredRoute], [], [], []);
-        }
-
-        if (!string.Equals(actual.OwnershipTag, ownershipTag, StringComparison.Ordinal))
-        {
-            if (!RouteMatches(desiredRoute, actual))
-            {
-                return new RoutePlan([], [], [], [new RouteConflict(desiredRoute.Hostname, "Hostname exists but is not owned by this operator.")]);
-            }
-
-            return new RoutePlan([], [], [], []);
-        }
-
-        if (!RouteMatches(desiredRoute, actual))
-        {
-            return new RoutePlan([], [desiredRoute], [], []);
-        }
-
-        return new RoutePlan([], [], [], []);
+        return actual is null
+            ? new RoutePlan([desiredRoute], [], [], [])
+            : !string.Equals(actual.OwnershipTag, ownershipTag, StringComparison.Ordinal)
+                ? RouteMatches(desiredRoute, actual)
+                ? new RoutePlan([], [], [], [])
+                : new RoutePlan([], [], [], [new RouteConflict(desiredRoute.Hostname, "Hostname exists but is not owned by this operator.")])
+                : RouteMatches(desiredRoute, actual)
+                    ? new RoutePlan([], [], [], [])
+                    : new RoutePlan([], [desiredRoute], [], []);
     }
 
     public static RoutePlan BuildCleanupPlan(
@@ -108,12 +96,9 @@ public static class RoutePlanner
         var actual = actualRoutes.FirstOrDefault(
             route => string.Equals(route.Hostname, hostname, StringComparison.OrdinalIgnoreCase));
 
-        if (actual is null || !string.Equals(actual.OwnershipTag, ownershipTag, StringComparison.Ordinal))
-        {
-            return new RoutePlan([], [], [], []);
-        }
-
-        return new RoutePlan([], [], [actual], []);
+        return actual is null || !string.Equals(actual.OwnershipTag, ownershipTag, StringComparison.Ordinal)
+            ? new RoutePlan([], [], [], [])
+            : new RoutePlan([], [], [actual], []);
     }
 
     private static bool RouteMatches(PublicHostnameRoute left, PublicHostnameRoute right)

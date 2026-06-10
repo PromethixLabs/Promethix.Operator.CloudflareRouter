@@ -44,11 +44,10 @@ public sealed class CloudflareTunnelRouteClient(
 
         var ownershipByHostname = await ownershipStore.GetOwnershipAsync(cancellationToken).ConfigureAwait(false);
 
-        return configuration.Ingress
+        return [.. configuration.Ingress
             .Where(rule => !string.IsNullOrWhiteSpace(rule.Hostname))
             .Where(rule => rule.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || rule.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            .Select(rule => ToRoute(rule, ownershipByHostname))
-            .ToArray();
+            .Select(rule => ToRoute(rule, ownershipByHostname))];
     }
 
     public async Task ApplyAsync(RoutePlan plan, CancellationToken cancellationToken)
@@ -84,7 +83,7 @@ public sealed class CloudflareTunnelRouteClient(
 
         foreach (var route in plan.ToDelete)
         {
-            updatedOwnership.Remove(route.Hostname);
+            _ = updatedOwnership.Remove(route.Hostname);
         }
 
         foreach (var route in plan.ToCreate.Concat(plan.ToUpdate))
@@ -119,7 +118,7 @@ public sealed class CloudflareTunnelRouteClient(
             new Uri($"accounts/{accountId}/cfd_tunnel/{tunnelId}/configurations", UriKind.Relative),
             cancellationToken).ConfigureAwait(false);
 
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
 
         var envelope = await response.Content.ReadFromJsonAsync<CloudflareApiEnvelope<TunnelConfigurationResponse>>(
             JsonOptions,
@@ -151,6 +150,6 @@ public sealed class CloudflareTunnelRouteClient(
 
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         LogCloudflareWriteRejected(logger, (int)response.StatusCode, responseBody, null);
-        response.EnsureSuccessStatusCode();
+        _ = response.EnsureSuccessStatusCode();
     }
 }

@@ -6,5 +6,5 @@ public sealed record RoutePlan(
     IReadOnlyCollection<PublicHostnameRoute> ToDelete,
     IReadOnlyCollection<RouteConflict> Conflicts)
 {
-    public bool HasChanges => this.ToCreate.Count > 0 || this.ToUpdate.Count > 0 || this.ToDelete.Count > 0;
+    public bool HasChanges => ToCreate.Count > 0 || ToUpdate.Count > 0 || ToDelete.Count > 0;
 }

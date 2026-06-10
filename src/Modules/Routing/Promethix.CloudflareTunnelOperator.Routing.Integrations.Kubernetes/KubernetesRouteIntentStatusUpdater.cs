@@ -211,7 +211,7 @@ public sealed class KubernetesRouteIntentStatusUpdater(
         {
             try
             {
-                await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
+                _ = await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
                     patch,
                     TunnelPublicHostnameCustomResource.Group,
                     TunnelPublicHostnameCustomResource.Version,

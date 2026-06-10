@@ -19,7 +19,7 @@ public sealed class ReconciliationFailedException : Exception
     public ReconciliationFailedException(RouteIntentDocument intent, Exception innerException)
         : base("Route reconciliation failed after route intent was loaded.", innerException)
     {
-        this.Intent = intent ?? throw new ArgumentNullException(nameof(intent));
+        Intent = intent ?? throw new ArgumentNullException(nameof(intent));
     }
 
     public RouteIntentDocument? Intent { get; }

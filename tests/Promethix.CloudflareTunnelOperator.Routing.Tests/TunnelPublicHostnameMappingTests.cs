@@ -31,11 +31,11 @@ public sealed class TunnelPublicHostnameMappingTests
             },
         };
 
-        resource.Spec.Enabled.Should().BeTrue();
-        resource.Spec.Cloudflare.Proxied.Should().BeTrue();
-        resource.Spec.TunnelRef.Name.Should().Be("delta-public");
-        resource.Spec.Target.Mode.Should().Be("ingress");
-        resource.Spec.Target.Ingress!.ClassName.Should().Be("traefik-cloudflare-tunnel");
+        _ = resource.Spec.Enabled.Should().BeTrue();
+        _ = resource.Spec.Cloudflare.Proxied.Should().BeTrue();
+        _ = resource.Spec.TunnelRef.Name.Should().Be("delta-public");
+        _ = resource.Spec.Target.Mode.Should().Be("ingress");
+        _ = resource.Spec.Target.Ingress!.ClassName.Should().Be("traefik-cloudflare-tunnel");
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class TunnelPublicHostnameMappingTests
 
         var result = validator.Validate(Options.DefaultName, options);
 
-        result.Succeeded.Should().BeTrue();
+        _ = result.Succeeded.Should().BeTrue();
     }
 
     [Fact]
@@ -112,10 +112,10 @@ public sealed class TunnelPublicHostnameMappingTests
 
         var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
 
-        invalidIntent.Should().BeNull();
-        managedIntent.Should().NotBeNull();
-        managedIntent!.Route.OriginService.Should().Be(new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443"));
-        managedIntent.Route.OriginServerName.Should().Be("whoami.delta.promethix.net");
+        _ = invalidIntent.Should().BeNull();
+        _ = managedIntent.Should().NotBeNull();
+        _ = managedIntent!.Route.OriginService.Should().Be(new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443"));
+        _ = managedIntent.Route.OriginServerName.Should().Be("whoami.delta.promethix.net");
     }
 
     private sealed class AcceptingIngressTargetValidator : IIngressTargetValidator

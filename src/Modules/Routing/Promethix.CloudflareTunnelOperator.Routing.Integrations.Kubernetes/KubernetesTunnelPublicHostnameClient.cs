@@ -133,12 +133,9 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     {
         ArgumentNullException.ThrowIfNull(resource);
 
-        if (!string.IsNullOrWhiteSpace(resource.Status?.AppliedHostname))
-        {
-            return resource.Status.AppliedHostname;
-        }
-
-        return string.IsNullOrWhiteSpace(resource.Spec.Hostname) ? null : resource.Spec.Hostname;
+        return !string.IsNullOrWhiteSpace(resource.Status?.AppliedHostname)
+            ? resource.Status.AppliedHostname
+            : string.IsNullOrWhiteSpace(resource.Spec.Hostname) ? null : resource.Spec.Hostname;
     }
 
     public async Task<(ManagedRouteIntent? ManagedIntent, InvalidRouteIntent? InvalidIntent)> TryBuildIntentAsync(
@@ -216,7 +213,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
             }
             else
             {
-                finalizers.RemoveAll(value => string.Equals(value, options.Value.ManagedFinalizerName, StringComparison.Ordinal));
+                _ = finalizers.RemoveAll(value => string.Equals(value, options.Value.ManagedFinalizerName, StringComparison.Ordinal));
             }
 
             var patchDocument = new
@@ -232,7 +229,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
 
             try
             {
-                await kubernetes.CustomObjects.PatchNamespacedCustomObjectAsync(
+                _ = await kubernetes.CustomObjects.PatchNamespacedCustomObjectAsync(
                     patch,
                     TunnelPublicHostnameCustomResource.Group,
                     TunnelPublicHostnameCustomResource.Version,
@@ -265,17 +262,11 @@ public sealed class KubernetesTunnelPublicHostnameClient(
 
     private static RouteProtocol ParseProtocol(string protocol)
     {
-        if (string.Equals(protocol.Trim(), "http", StringComparison.OrdinalIgnoreCase))
-        {
-            return RouteProtocol.Http;
-        }
-
-        if (string.Equals(protocol.Trim(), "https", StringComparison.OrdinalIgnoreCase))
-        {
-            return RouteProtocol.Https;
-        }
-
-        throw new InvalidOperationException($"Unsupported origin protocol '{protocol}'.");
+        return string.Equals(protocol.Trim(), "https", StringComparison.OrdinalIgnoreCase)
+            ? RouteProtocol.Https
+            : string.Equals(protocol.Trim(), "http", StringComparison.OrdinalIgnoreCase)
+                ? RouteProtocol.Http
+                : throw new InvalidOperationException($"Unsupported origin protocol '{protocol}'.");
     }
 
     private async Task<PublicHostnameRoute> ToRouteAsync(
@@ -285,22 +276,13 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     {
         var target = resource.Spec.Target;
 
-        if (target is null || string.IsNullOrWhiteSpace(target.Mode))
-        {
-            return ToLegacyDirectRoute(resource, ownershipTag);
-        }
-
-        if (string.Equals(target.Mode.Trim(), "ingress", StringComparison.OrdinalIgnoreCase))
-        {
-            return await ToIngressRouteAsync(resource, target, ownershipTag, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (string.Equals(target.Mode.Trim(), "direct", StringComparison.OrdinalIgnoreCase))
-        {
-            return ToDirectRoute(resource, target, ownershipTag);
-        }
-
-        throw new InvalidOperationException($"Unsupported target mode '{target.Mode}'.");
+        return target is null || string.IsNullOrWhiteSpace(target.Mode)
+            ? ToLegacyDirectRoute(resource, ownershipTag)
+            : string.Equals(target.Mode.Trim(), "ingress", StringComparison.OrdinalIgnoreCase)
+                ? await ToIngressRouteAsync(resource, target, ownershipTag, cancellationToken).ConfigureAwait(false)
+                : string.Equals(target.Mode.Trim(), "direct", StringComparison.OrdinalIgnoreCase)
+                    ? ToDirectRoute(resource, target, ownershipTag)
+                    : throw new InvalidOperationException($"Unsupported target mode '{target.Mode}'.");
     }
 
     private async Task<PublicHostnameRoute> ToIngressRouteAsync(
@@ -382,12 +364,9 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         }
 
         var scheme = ingress.Service.Scheme?.Trim();
-        if (!string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("spec.target.ingress.service.scheme must be http or https when spec.target.ingress.service is supplied.");
-        }
-
-        return new Uri($"{scheme}://{ingress.Service.Name}.{ingress.Service.Namespace}.svc.cluster.local:{ingress.Service.Port}");
+        return !string.Equals(scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            ? throw new InvalidOperationException("spec.target.ingress.service.scheme must be http or https when spec.target.ingress.service is supplied.")
+            : new Uri($"{scheme}://{ingress.Service.Name}.{ingress.Service.Namespace}.svc.cluster.local:{ingress.Service.Port}");
     }
 }

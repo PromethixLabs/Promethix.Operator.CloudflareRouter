@@ -18,9 +18,9 @@ public sealed class RouteIntentWorkQueueTests
         var first = await queue.WaitAsync(TimeSpan.FromMilliseconds(10), CancellationToken.None);
         var second = await queue.WaitAsync(TimeSpan.FromMilliseconds(10), CancellationToken.None);
 
-        first.Kind.Should().Be(RouteIntentWorkItemKind.Resource);
-        first.ResourceKey.Should().Be(key);
-        second.Kind.Should().Be(RouteIntentWorkItemKind.FullResync);
-        second.Reason.Should().Be("interval");
+        _ = first.Kind.Should().Be(RouteIntentWorkItemKind.Resource);
+        _ = first.ResourceKey.Should().Be(key);
+        _ = second.Kind.Should().Be(RouteIntentWorkItemKind.FullResync);
+        _ = second.Reason.Should().Be("interval");
     }
 }

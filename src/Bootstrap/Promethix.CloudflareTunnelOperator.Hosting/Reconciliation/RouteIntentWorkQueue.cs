@@ -28,7 +28,7 @@ internal sealed class RouteIntentWorkQueue
             fullResyncPending = true;
         }
 
-        workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, NormalizeReason(reason)));
+        _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, NormalizeReason(reason)));
     }
 
     public void EnqueueResource(TunnelPublicHostnameResourceKey key, string reason)
@@ -41,7 +41,7 @@ internal sealed class RouteIntentWorkQueue
             }
         }
 
-        workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.Resource, NormalizeReason(reason), key));
+        _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.Resource, NormalizeReason(reason), key));
     }
 
     public async ValueTask<RouteIntentWorkItem> WaitAsync(TimeSpan fallbackInterval, CancellationToken cancellationToken)
@@ -65,7 +65,7 @@ internal sealed class RouteIntentWorkQueue
                 }
                 else if (item.ResourceKey is { } key)
                 {
-                    pendingResources.Remove(key);
+                    _ = pendingResources.Remove(key);
                 }
             }
 

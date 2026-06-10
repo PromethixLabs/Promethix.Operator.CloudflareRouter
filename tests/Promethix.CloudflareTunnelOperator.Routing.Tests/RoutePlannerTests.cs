@@ -16,12 +16,12 @@ public sealed class RoutePlannerTests
             PublicHostnameRoute.Create("app.example.com", new Uri("https://app.default.svc.cluster.local:8443"), RouteProtocol.Https, OwnershipTag),
         };
 
-        var plan = RoutePlanner.BuildPlan(desired, Array.Empty<PublicHostnameRoute>(), OwnershipTag);
+        var plan = RoutePlanner.BuildPlan(desired, [], OwnershipTag);
 
-        plan.ToCreate.Should().ContainSingle();
-        plan.ToUpdate.Should().BeEmpty();
-        plan.ToDelete.Should().BeEmpty();
-        plan.Conflicts.Should().BeEmpty();
+        _ = plan.ToCreate.Should().ContainSingle();
+        _ = plan.ToUpdate.Should().BeEmpty();
+        _ = plan.ToDelete.Should().BeEmpty();
+        _ = plan.Conflicts.Should().BeEmpty();
     }
 
     [Fact]
@@ -32,10 +32,10 @@ public sealed class RoutePlannerTests
             PublicHostnameRoute.Create("shared.example.com", new Uri("https://shared.default.svc.cluster.local:8443"), RouteProtocol.Https, "another-operator"),
         };
 
-        var plan = RoutePlanner.BuildPlan(Array.Empty<PublicHostnameRoute>(), actual, OwnershipTag);
+        var plan = RoutePlanner.BuildPlan([], actual, OwnershipTag);
 
-        plan.ToDelete.Should().BeEmpty();
-        plan.Conflicts.Should().BeEmpty();
+        _ = plan.ToDelete.Should().BeEmpty();
+        _ = plan.Conflicts.Should().BeEmpty();
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public sealed class RoutePlannerTests
 
         var plan = RoutePlanner.BuildPlan(desired, actual, OwnershipTag);
 
-        plan.Conflicts.Should().ContainSingle().Which.Hostname.Should().Be("conflict.example.com");
-        plan.ToCreate.Should().BeEmpty();
-        plan.ToUpdate.Should().BeEmpty();
+        _ = plan.Conflicts.Should().ContainSingle().Which.Hostname.Should().Be("conflict.example.com");
+        _ = plan.ToCreate.Should().BeEmpty();
+        _ = plan.ToUpdate.Should().BeEmpty();
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public sealed class RoutePlannerTests
 
         var plan = RoutePlanner.BuildManagePlan(desired, actual, OwnershipTag);
 
-        plan.ToUpdate.Should().ContainSingle().Which.Hostname.Should().Be("app.example.com");
-        plan.ToDelete.Should().BeEmpty();
+        _ = plan.ToUpdate.Should().ContainSingle().Which.Hostname.Should().Be("app.example.com");
+        _ = plan.ToDelete.Should().BeEmpty();
     }
 
     [Fact]
@@ -101,10 +101,10 @@ public sealed class RoutePlannerTests
 
         var plan = RoutePlanner.BuildPlan(desired, actual, OwnershipTag);
 
-        plan.ToUpdate.Should().ContainSingle();
-        plan.ToCreate.Should().BeEmpty();
-        plan.ToDelete.Should().BeEmpty();
-        plan.Conflicts.Should().BeEmpty();
+        _ = plan.ToUpdate.Should().ContainSingle();
+        _ = plan.ToCreate.Should().BeEmpty();
+        _ = plan.ToDelete.Should().BeEmpty();
+        _ = plan.Conflicts.Should().BeEmpty();
     }
 
     [Fact]
@@ -128,10 +128,10 @@ public sealed class RoutePlannerTests
 
         var plan = RoutePlanner.BuildManagePlan(desired, actual, OwnershipTag);
 
-        plan.ToUpdate.Should().ContainSingle();
-        plan.ToCreate.Should().BeEmpty();
-        plan.ToDelete.Should().BeEmpty();
-        plan.Conflicts.Should().BeEmpty();
+        _ = plan.ToUpdate.Should().ContainSingle();
+        _ = plan.ToCreate.Should().BeEmpty();
+        _ = plan.ToDelete.Should().BeEmpty();
+        _ = plan.Conflicts.Should().BeEmpty();
     }
 
     [Fact]
@@ -145,9 +145,9 @@ public sealed class RoutePlannerTests
 
         var plan = RoutePlanner.BuildCleanupPlan("app.example.com", actual, OwnershipTag);
 
-        plan.ToDelete.Should().ContainSingle().Which.Hostname.Should().Be("app.example.com");
-        plan.ToCreate.Should().BeEmpty();
-        plan.ToUpdate.Should().BeEmpty();
-        plan.Conflicts.Should().BeEmpty();
+        _ = plan.ToDelete.Should().ContainSingle().Which.Hostname.Should().Be("app.example.com");
+        _ = plan.ToCreate.Should().BeEmpty();
+        _ = plan.ToUpdate.Should().BeEmpty();
+        _ = plan.Conflicts.Should().BeEmpty();
     }
 }

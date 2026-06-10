@@ -39,8 +39,8 @@ public sealed class RouteReconcilerTests
             CancellationToken.None);
 
         var exception = await act.Should().ThrowAsync<ReconciliationFailedException>();
-        exception.Which.Intent.Should().Be(intent);
-        exception.Which.InnerException.Should().BeOfType<InvalidOperationException>();
+        _ = exception.Which.Intent.Should().Be(intent);
+        _ = exception.Which.InnerException.Should().BeOfType<InvalidOperationException>();
     }
 
     private sealed class StubIntentSource(RouteIntentDocument document) : IClusterRouteIntentSource

@@ -31,12 +31,9 @@ public sealed class KubernetesOwnershipStore(
                 options.Value.OwnershipConfigMapNamespace,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            if (configMap.Data is null || !configMap.Data.TryGetValue(OwnershipDataKey, out var json) || string.IsNullOrWhiteSpace(json))
-            {
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            }
-
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+            return configMap.Data is null || !configMap.Data.TryGetValue(OwnershipDataKey, out var json) || string.IsNullOrWhiteSpace(json)
+                ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                : JsonSerializer.Deserialize<Dictionary<string, string>>(json)
                 ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
         catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
@@ -61,7 +58,7 @@ public sealed class KubernetesOwnershipStore(
             existing.Data ??= new Dictionary<string, string>(StringComparer.Ordinal);
             existing.Data[OwnershipDataKey] = serializedOwnership;
 
-            await kubernetes.CoreV1.ReplaceNamespacedConfigMapAsync(
+            _ = await kubernetes.CoreV1.ReplaceNamespacedConfigMapAsync(
                 existing,
                 existing.Metadata.Name,
                 existing.Metadata.NamespaceProperty,
@@ -84,7 +81,7 @@ public sealed class KubernetesOwnershipStore(
                 },
             };
 
-            await kubernetes.CoreV1.CreateNamespacedConfigMapAsync(
+            _ = await kubernetes.CoreV1.CreateNamespacedConfigMapAsync(
                 configMap,
                 options.Value.OwnershipConfigMapNamespace,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
