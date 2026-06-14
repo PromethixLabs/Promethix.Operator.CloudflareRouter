@@ -16,6 +16,8 @@ RUN dotnet publish src/Bootstrap/Promethix.CloudflareTunnelOperator.Hosting/Prom
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-alpine3.23
 WORKDIR /app
 
+RUN apk upgrade --no-cache libcrypto3 libssl3
+
 ARG BUILD_MAJOR=0
 ARG BUILD_MINOR=0
 ARG BUILD_REVISION=0
