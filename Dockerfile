@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine3.23 AS build
 WORKDIR /src
 
 ARG BUILD_MAJOR=0
@@ -13,7 +13,7 @@ ARG BUILD_DATE=unknown
 COPY . .
 RUN dotnet publish src/Bootstrap/Promethix.CloudflareTunnelOperator.Hosting/Promethix.CloudflareTunnelOperator.Hosting.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-alpine3.23
 WORKDIR /app
 
 ARG BUILD_MAJOR=0
