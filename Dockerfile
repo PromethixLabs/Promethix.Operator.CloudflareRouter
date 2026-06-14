@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
 ARG BUILD_MAJOR=0
@@ -13,7 +13,7 @@ ARG BUILD_DATE=unknown
 COPY . .
 RUN dotnet publish src/Bootstrap/Promethix.CloudflareTunnelOperator.Hosting/Promethix.CloudflareTunnelOperator.Hosting.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 WORKDIR /app
 
 ARG BUILD_MAJOR=0
@@ -36,7 +36,8 @@ LABEL org.promethix.build.revision="${BUILD_REVISION}"
 LABEL org.promethix.build.number="${BUILD_NUMBER}"
 LABEL org.promethix.build.display="${BUILD_DISPLAY}"
 
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 EXPOSE 8080
 
 COPY --from=build /app/publish .
