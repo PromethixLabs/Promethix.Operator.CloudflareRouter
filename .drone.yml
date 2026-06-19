@@ -62,6 +62,15 @@ trigger:
     - custom
   ref:
     - refs/heads/main
+  paths:
+    include:
+      - .drone.yml
+      - .drone/version-prefix.env
+      - Directory.Build.props
+      - Dockerfile
+      - Promethix.CloudflareTunnelOperator.slnx
+      - src/**
+      - tests/**
 
 steps:
   - name: restore
