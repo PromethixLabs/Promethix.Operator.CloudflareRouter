@@ -390,3 +390,27 @@ steps:
       - 'skopeo copy --src-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --dest-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --src-cert-dir /tmp/harbor-certs --dest-cert-dir /tmp/harbor-certs "docker://$${HARBOR_IMAGE_REPO}:$${SOURCE_TAG}" "docker://$${HARBOR_IMAGE_REPO}:latest"'
       - 'skopeo copy --src-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --dest-creds "$${GHCR_USERNAME}:$${GHCR_TOKEN}" --src-cert-dir /tmp/harbor-certs "docker://$${HARBOR_IMAGE_REPO}:$${SOURCE_TAG}" "docker://$${GHCR_IMAGE_REPO}:$${RELEASE_TAG}"'
       - 'skopeo copy --src-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --dest-creds "$${GHCR_USERNAME}:$${GHCR_TOKEN}" --src-cert-dir /tmp/harbor-certs "docker://$${HARBOR_IMAGE_REPO}:$${SOURCE_TAG}" "docker://$${GHCR_IMAGE_REPO}:latest"'
+
+  - name: tag-promoted-release
+    image: alpine:3.21
+    depends_on:
+      - retag-image-for-production
+    environment:
+      HOME: /root
+      GITHUB_PAGES_SSH_KEY:
+        from_secret: github_pages_ssh_key
+    commands:
+      - '. .drone/promote-production.env'
+      - 'if [ -z "$${GITHUB_PAGES_SSH_KEY}" ]; then echo "GitHub SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
+      - 'apk add --no-cache git openssh-client'
+      - 'releaseGitTag="v$${RELEASE_TAG}"'
+      - 'mkdir -p /root/.ssh'
+      - 'printf "%s" "$${GITHUB_PAGES_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
+      - 'chmod 600 /root/.ssh/id_ed25519'
+      - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub SSH private key format"; exit 1; }'
+      - 'git fetch --prune --tags origin'
+      - 'if git rev-parse -q --verify "refs/tags/$${releaseGitTag}" >/dev/null; then echo "Release tag $${releaseGitTag} already exists"; exit 0; fi'
+      - 'git config user.name "Drone CI"'
+      - 'git config user.email "drone@users.noreply.github.com"'
+      - 'git tag -a "$${releaseGitTag}" -m "Release $${RELEASE_TAG}" "$${DRONE_COMMIT_SHA}"'
+      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git push origin "refs/tags/$${releaseGitTag}"'

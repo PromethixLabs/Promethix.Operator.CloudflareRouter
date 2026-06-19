@@ -61,7 +61,7 @@ helm repo add promethix-cloudflare-tunnel-operator https://gentoorax.github.io/P
 helm repo update
 ```
 
-Charts are published from release tags.
+Charts are published from release tags. Production promotion creates the release tag used for chart publishing.
 
 Create a namespace and a Secret containing Cloudflare credentials:
 
