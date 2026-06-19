@@ -54,6 +54,15 @@ The Flux example is intentionally generic and uses placeholder secrets. Replace 
 
 ## Manual Helm Deployment
 
+Add the public Helm repository:
+
+```powershell
+helm repo add promethix-cloudflare-tunnel-operator https://gentoorax.github.io/Promethix.Operator.CloudflareRouter
+helm repo update
+```
+
+Charts are published from release tags.
+
 Create a namespace and a Secret containing Cloudflare credentials:
 
 ```powershell
@@ -66,12 +75,13 @@ kubectl create secret generic cloudflare-tunnel-operator `
   --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me
 ```
 
-Install from a local checkout:
+Install the chart:
 
 ```powershell
 helm upgrade --install cloudflare-tunnel-operator `
-  ./charts/promethix-cloudflare-tunnel-operator `
+  promethix-cloudflare-tunnel-operator/promethix-cloudflare-tunnel-operator `
   --namespace cloudflare-tunnel-operator-system `
+  --create-namespace `
   --set image.repository=ghcr.io/gentoorax/cloudflare-tunnel-operator `
   --set image.tag=latest `
   --set cloudflare.existingSecretName=cloudflare-tunnel-operator `
@@ -81,6 +91,8 @@ helm upgrade --install cloudflare-tunnel-operator `
 ```
 
 Keep `operator.applyChanges=false` for the first run. The operator will plan reconciliation and update CRD status without writing Cloudflare tunnel config. Set it to `true` only after validating logs, status, and ownership behavior.
+
+To install from a local checkout instead, replace the chart reference with `./charts/promethix-cloudflare-tunnel-operator`.
 
 For GitOps deployments, use the sample manifests in [examples/flux](examples/flux) as a starting point.
 

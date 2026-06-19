@@ -281,6 +281,53 @@ steps:
       - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git push gitea-mirror "refs/tags/$${DRONE_TAG}:refs/tags/$${DRONE_TAG}"'
 
 ---
+# Public Helm chart repository pipeline.
+# Publishes packaged charts to GitHub Pages on release tags only.
+kind: pipeline
+type: docker
+name: publish-helm-chart
+
+clone:
+  depth: 0
+
+trigger:
+  event:
+    - tag
+
+steps:
+  - name: publish-chart-to-github-pages
+    image: alpine:3.21
+    environment:
+      HOME: /root
+      GITHUB_PAGES_SSH_KEY:
+        from_secret: github_pages_ssh_key
+    commands:
+      - 'if [ -z "$${DRONE_TAG}" ]; then echo "DRONE_TAG is empty"; exit 1; fi'
+      - 'if [ -z "$${GITHUB_PAGES_SSH_KEY}" ]; then echo "GitHub Pages SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
+      - 'apk add --no-cache curl git openssh-client tar gzip'
+      - 'chartVersion="$${DRONE_TAG#v}"; printf "%s" "$${chartVersion}" | grep -Eq "^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" || { echo "Tag $${DRONE_TAG} is not a valid Helm SemVer version"; exit 1; }'
+      - 'curl -fsSL -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz'
+      - 'tar -xzf /tmp/helm.tar.gz -C /tmp'
+      - 'mv /tmp/linux-amd64/helm /usr/local/bin/helm'
+      - 'sed -i -E "s/^version:.*/version: $${chartVersion}/; s/^appVersion:.*/appVersion: \"$${chartVersion}\"/" charts/promethix-cloudflare-tunnel-operator/Chart.yaml'
+      - 'mkdir -p .helm-dist'
+      - 'helm package charts/promethix-cloudflare-tunnel-operator --destination .helm-dist'
+      - 'mkdir -p /root/.ssh'
+      - 'printf "%s" "$${GITHUB_PAGES_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
+      - 'chmod 600 /root/.ssh/id_ed25519'
+      - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub Pages SSH private key format"; exit 1; }'
+      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git clone --branch gh-pages --depth 1 git@github.com:gentoorax/Promethix.Operator.CloudflareRouter.git /tmp/gh-pages'
+      - 'cp .helm-dist/*.tgz /tmp/gh-pages/'
+      - 'helm repo index /tmp/gh-pages --url https://gentoorax.github.io/Promethix.Operator.CloudflareRouter --merge /tmp/gh-pages/index.yaml'
+      - 'cd /tmp/gh-pages'
+      - 'git config user.name "Drone CI"'
+      - 'git config user.email "drone@users.noreply.github.com"'
+      - 'git add index.yaml *.tgz'
+      - 'git diff --cached --quiet && { echo "No Helm chart changes to publish"; exit 0; }'
+      - 'git commit -m "Publish Helm chart $${chartVersion}"'
+      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git push origin gh-pages'
+
+---
 # Production promotion pipeline.
 # Retags an existing staging image to live production aliases without rebuilding it.
 kind: pipeline
