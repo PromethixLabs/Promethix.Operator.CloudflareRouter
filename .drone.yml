@@ -282,7 +282,9 @@ steps:
 
 ---
 # Public Helm chart repository pipeline.
-# Publishes packaged charts to GitHub Pages on release tags only.
+# Publishes packaged charts to GitHub Pages on SemVer tags only.
+# Stable tags publish normal Helm versions. Prerelease tags publish Helm prereleases,
+# which Helm hides unless users pass --devel.
 kind: pipeline
 type: docker
 name: publish-helm-chart
