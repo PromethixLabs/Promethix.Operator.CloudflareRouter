@@ -7,11 +7,12 @@ spec:
   interval: 10m
   chart:
     spec:
-      chart: ./charts/promethix-cloudflare-tunnel-operator
+      chart: promethix-cloudflare-tunnel-operator
       sourceRef:
-        kind: GitRepository
-        name: cloudflare-tunnel-operator
+        kind: HelmRepository
+        name: promethix
         namespace: flux-system
+      version: ">=1.0.0"
   values:
     image:
       repository: ghcr.io/promethixlabs/cloudflare-tunnel-operator

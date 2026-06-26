@@ -1,6 +1,6 @@
 # Flux Example
 
-These manifests show one way to deploy the operator with Flux using the Helm chart from this Git repository.
+These manifests show one way to deploy the operator with Flux using the public Promethix Labs Helm repository.
 
 They are intentionally generic. Replace:
 
@@ -8,13 +8,13 @@ They are intentionally generic. Replace:
 - namespace names
 - ingress target service URL
 - image tag
-- Git branch or tag
+- chart version range
 
 Files:
 
 - `namespace.yaml`
 - `cloudflare-secret.example.yaml`
-- `source.yaml`
+- `helmrepository.yaml`
 - `helmrelease.yaml`
 - `kustomization.yaml`
 
