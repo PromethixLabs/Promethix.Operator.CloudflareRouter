@@ -299,11 +299,11 @@ steps:
     image: alpine:3.21
     environment:
       HOME: /root
-      GITHUB_PAGES_SSH_KEY:
-        from_secret: github_pages_ssh_key
+      PROMETHIXLABS_CHARTS_SSH_KEY:
+        from_secret: promethixlabs_charts_ssh_key
     commands:
       - 'if [ -z "$${DRONE_TAG}" ]; then echo "DRONE_TAG is empty"; exit 1; fi'
-      - 'if [ -z "$${GITHUB_PAGES_SSH_KEY}" ]; then echo "GitHub Pages SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
+      - 'if [ -z "$${PROMETHIXLABS_CHARTS_SSH_KEY}" ]; then echo "Promethix Labs charts SSH key secret is missing (promethixlabs_charts_ssh_key)"; exit 1; fi'
       - 'apk add --no-cache curl git openssh-client tar gzip'
       - 'chartVersion="$${DRONE_TAG#v}"; printf "%s" "$${chartVersion}" | grep -Eq "^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" || { echo "Tag $${DRONE_TAG} is not a valid Helm SemVer version"; exit 1; }'
       - 'curl -fsSL -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz'
@@ -313,12 +313,12 @@ steps:
       - 'mkdir -p .helm-dist'
       - 'helm package charts/promethix-cloudflare-tunnel-operator --destination .helm-dist'
       - 'mkdir -p /root/.ssh'
-      - 'printf "%s" "$${GITHUB_PAGES_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
+      - 'printf "%s" "$${PROMETHIXLABS_CHARTS_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
       - 'chmod 600 /root/.ssh/id_ed25519'
       - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub Pages SSH private key format"; exit 1; }'
-      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git clone --branch gh-pages --depth 1 git@github.com:gentoorax/Promethix.Operator.CloudflareRouter.git /tmp/gh-pages'
+      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git clone --branch gh-pages --depth 1 git@github.com:promethixlabs/charts.git /tmp/gh-pages'
       - 'cp .helm-dist/*.tgz /tmp/gh-pages/'
-      - 'helm repo index /tmp/gh-pages --url https://gentoorax.github.io/Promethix.Operator.CloudflareRouter --merge /tmp/gh-pages/index.yaml'
+      - 'helm repo index /tmp/gh-pages --url https://promethixlabs.github.io/charts --merge /tmp/gh-pages/index.yaml'
       - 'cd /tmp/gh-pages'
       - 'git config user.name "Drone CI"'
       - 'git config user.email "drone@users.noreply.github.com"'
@@ -397,15 +397,15 @@ steps:
       - retag-image-for-production
     environment:
       HOME: /root
-      GITHUB_PAGES_SSH_KEY:
+      GITHUB_RELEASE_TAG_SSH_KEY:
         from_secret: github_pages_ssh_key
     commands:
       - '. .drone/promote-production.env'
-      - 'if [ -z "$${GITHUB_PAGES_SSH_KEY}" ]; then echo "GitHub SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
+      - 'if [ -z "$${GITHUB_RELEASE_TAG_SSH_KEY}" ]; then echo "GitHub release tag SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
       - 'apk add --no-cache git openssh-client'
       - 'releaseGitTag="v$${RELEASE_TAG}"'
       - 'mkdir -p /root/.ssh'
-      - 'printf "%s" "$${GITHUB_PAGES_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
+      - 'printf "%s" "$${GITHUB_RELEASE_TAG_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
       - 'chmod 600 /root/.ssh/id_ed25519'
       - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub SSH private key format"; exit 1; }'
       - 'git fetch --prune --tags origin'

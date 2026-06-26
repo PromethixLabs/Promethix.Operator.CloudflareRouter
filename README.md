@@ -57,7 +57,7 @@ The Flux example is intentionally generic and uses placeholder secrets. Replace 
 Add the public Helm repository:
 
 ```powershell
-helm repo add promethix-cloudflare-tunnel-operator https://gentoorax.github.io/Promethix.Operator.CloudflareRouter
+helm repo add promethix https://promethixlabs.github.io/charts
 helm repo update
 ```
 
@@ -79,7 +79,7 @@ Install the chart:
 
 ```powershell
 helm upgrade --install cloudflare-tunnel-operator `
-  promethix-cloudflare-tunnel-operator/promethix-cloudflare-tunnel-operator `
+  promethix/promethix-cloudflare-tunnel-operator `
   --namespace cloudflare-tunnel-operator-system `
   --create-namespace `
   --set image.repository=ghcr.io/gentoorax/cloudflare-tunnel-operator `
