@@ -61,6 +61,7 @@ trigger:
     - custom
   ref:
     - refs/heads/main
+    - refs/heads/feature/cloudflare-security-policies
   paths:
     include:
       - .drone.yml
