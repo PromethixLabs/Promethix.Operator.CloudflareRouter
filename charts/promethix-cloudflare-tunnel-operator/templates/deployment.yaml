@@ -42,6 +42,10 @@ spec:
               value: {{ .Values.operator.managedIngressClassName | quote }}
             - name: KubernetesOperator__IngressTargetUrl
               value: {{ .Values.operator.ingressTargetUrl | quote }}
+            - name: KubernetesOperator__AllowIngressServiceOverride
+              value: {{ .Values.operator.allowIngressServiceOverride | quote }}
+            - name: KubernetesOperator__AllowCrossNamespaceDirectTargets
+              value: {{ .Values.operator.allowCrossNamespaceDirectTargets | quote }}
             - name: KubernetesOperator__ManagedFinalizerName
               value: {{ .Values.operator.managedFinalizerName | quote }}
             - name: KubernetesOperator__OwnershipConfigMapNamespace

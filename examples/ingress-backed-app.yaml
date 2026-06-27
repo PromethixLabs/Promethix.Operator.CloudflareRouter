@@ -74,12 +74,8 @@ spec:
     mode: ingress
     ingress:
       className: traefik-cloudflare-tunnel
-      service:
-        name: traefik-cloudflare-tunnel
-        namespace: traefik
-        port: 443
-        scheme: https
       # The operator will emit originRequest.originServerName=whoami.example.com
       # so cloudflared verifies the Traefik certificate against the public hostname.
+      # The Cloudflare Tunnel origin is the operator's configured ingressTargetUrl.
   cloudflare:
     proxied: true

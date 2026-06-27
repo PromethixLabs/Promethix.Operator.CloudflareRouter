@@ -22,6 +22,8 @@ operator:
   managedTunnelName: public-tunnel
   managedIngressClassName: traefik-cloudflare-tunnel
   ingressTargetUrl: https://traefik-cloudflare-tunnel.traefik.svc.cluster.local
+  allowIngressServiceOverride: false
+  allowCrossNamespaceDirectTargets: false
   managedFinalizerName: edge.promethix.net/tunnelpublichostname-protection
   ownershipTag: promethix-cloudflare-tunnel-operator
   ownershipConfigMapNamespace: cloudflare-tunnel-operator-system

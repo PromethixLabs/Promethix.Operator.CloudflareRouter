@@ -69,13 +69,9 @@ The operator validates:
 
 - the managed class and tunnel name
 - the ingress class declared in the CRD
-- the optional target service, if specified
 - the existence of a matching Kubernetes `Ingress` for the hostname and ingress class
 
-Ingress-backed targets can be resolved in two ways:
-
-- shared default target from operator configuration
-- explicit service override in the CRD
+Ingress-backed targets use the shared default target from operator configuration. Per-resource ingress service override is disabled by default and should only be enabled for trusted, single-tenant deployments.
 
 If the configured ingress target uses HTTPS, the operator emits Cloudflare `originRequest.originServerName` using the public hostname from `TunnelPublicHostname.spec.hostname`.
 This allows cloudflared to verify the Traefik certificate against the public host name rather than the Kubernetes service DNS name used for the internal origin connection.
@@ -95,6 +91,8 @@ The operator is designed for shared-tunnel scenarios.
 - only routes owned by this operator are eligible for deletion
 - conflicting unmanaged hostnames are surfaced as conflicts, not overwritten
 - dry-run operation is supported through `applyChanges=false`
+- direct service targets must stay in the same namespace as the `TunnelPublicHostname` by default
+- ingress service overrides are disabled by default
 
 This is intentional. The operator should be safe to introduce into an existing tunnel without taking ownership of unrelated routes.
 

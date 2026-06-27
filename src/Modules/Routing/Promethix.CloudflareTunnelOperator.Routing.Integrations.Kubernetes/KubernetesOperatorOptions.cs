@@ -12,6 +12,10 @@ public sealed class KubernetesOperatorOptions
 
     public Uri IngressTargetUrl { get; set; } = new("https://traefik-cloudflare-tunnel.traefik.svc.cluster.local");
 
+    public bool AllowIngressServiceOverride { get; set; }
+
+    public bool AllowCrossNamespaceDirectTargets { get; set; }
+
     public string ManagedFinalizerName { get; set; } = "edge.promethix.net/tunnelpublichostname-protection";
 
     public string OwnershipConfigMapNamespace { get; set; } = "cloudflare-tunnel-operator-system";

@@ -25,6 +25,8 @@ The preferred path is ingress-backed:
 
 Direct origin publication is also supported for cases where going through ingress is not appropriate.
 
+For multi-tenant safety, direct service targets are restricted to the same namespace as the `TunnelPublicHostname` by default. Per-resource ingress service overrides are also disabled by default; ingress mode normally uses the operator's configured `ingressTargetUrl`.
+
 ## Project layout
 
 ```text

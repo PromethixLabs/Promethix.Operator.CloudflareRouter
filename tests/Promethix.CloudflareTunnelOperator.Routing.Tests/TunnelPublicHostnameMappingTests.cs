@@ -62,24 +62,7 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task IngressTargetCanOverrideDefaultService()
     {
-        var client = new KubernetesTunnelPublicHostnameClient(
-            kubernetes: null!,
-            Options.Create(new KubernetesOperatorOptions
-            {
-                ManagedClassName = "public",
-                ManagedTunnelName = "delta-public",
-                ManagedIngressClassName = "traefik-cloudflare-tunnel",
-                IngressTargetUrl = new Uri("https://default.edge-system.svc.cluster.local"),
-                ManagedFinalizerName = "edge.promethix.net/tunnelpublichostname-protection",
-                OwnershipConfigMapNamespace = "edge-system",
-                OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",
-            }),
-            Options.Create(new RoutingOperatorOptions
-            {
-                OwnershipTag = "promethix-cloudflare-tunnel-operator",
-            }),
-            new AcceptingIngressTargetValidator(),
-            NullLogger<KubernetesTunnelPublicHostnameClient>.Instance);
+        var client = CreateClient(options => options.AllowIngressServiceOverride = true);
 
         var resource = new TunnelPublicHostnameCustomResource
         {
@@ -117,6 +100,19 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = managedIntent.Should().NotBeNull();
         _ = managedIntent!.Route.OriginService.Should().Be(new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443"));
         _ = managedIntent.Route.OriginServerName.Should().Be("whoami.delta.promethix.net");
+    }
+
+    [Fact]
+    public async Task IngressServiceOverrideIsRejectedByDefault()
+    {
+        var client = CreateClient();
+        var resource = CreateIngressOverrideResource();
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent!.Reason.Should().Be("spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
     }
 
     [Fact]
@@ -158,6 +154,87 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = managedIntent.Should().NotBeNull();
         Assert.NotNull(managedIntent);
         _ = managedIntent.Route.OriginService.Should().Be(new Uri("https://api.demo.svc.cluster.local:8443"));
+    }
+
+    [Fact]
+    public async Task DirectServiceTargetCannotCrossNamespaceByDefault()
+    {
+        var client = CreateClient();
+        var resource = new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "api-direct",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "api.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "direct",
+                    Direct = new TunnelDirectTargetSpec
+                    {
+                        Service = new TunnelIngressServiceTargetSpec
+                        {
+                            Name = "api",
+                            Namespace = "other",
+                            Port = 8443,
+                            Scheme = "https",
+                        },
+                    },
+                },
+            },
+        };
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent!.Reason.Should().Be("spec.target.direct.service.namespace must match the TunnelPublicHostname namespace unless cross-namespace direct targets are explicitly enabled.");
+    }
+
+    [Fact]
+    public async Task DirectServiceTargetCanCrossNamespaceWhenExplicitlyAllowed()
+    {
+        var client = CreateClient(options => options.AllowCrossNamespaceDirectTargets = true);
+        var resource = new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "api-direct",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "api.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "direct",
+                    Direct = new TunnelDirectTargetSpec
+                    {
+                        Service = new TunnelIngressServiceTargetSpec
+                        {
+                            Name = "api",
+                            Namespace = "other",
+                            Port = 8443,
+                            Scheme = "https",
+                        },
+                    },
+                },
+            },
+        };
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = invalidIntent.Should().BeNull();
+        _ = managedIntent.Should().NotBeNull();
+        Assert.NotNull(managedIntent);
+        _ = managedIntent.Route.OriginService.Should().Be(new Uri("https://api.other.svc.cluster.local:8443"));
     }
 
     [Fact]
@@ -207,20 +284,56 @@ public sealed class TunnelPublicHostnameMappingTests
         }
     }
 
-    private static KubernetesTunnelPublicHostnameClient CreateClient()
+    private static TunnelPublicHostnameCustomResource CreateIngressOverrideResource()
     {
+        return new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "whoami-public",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "whoami.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "ingress",
+                    Ingress = new TunnelIngressTargetSpec
+                    {
+                        ClassName = "traefik-cloudflare-tunnel",
+                        Service = new TunnelIngressServiceTargetSpec
+                        {
+                            Name = "traefik-cloudflare-tunnel",
+                            Namespace = "edge-system",
+                            Port = 443,
+                            Scheme = "https",
+                        },
+                    },
+                },
+            },
+        };
+    }
+
+    private static KubernetesTunnelPublicHostnameClient CreateClient(Action<KubernetesOperatorOptions>? configure = null)
+    {
+        var kubernetesOptions = new KubernetesOperatorOptions
+        {
+            ManagedClassName = "public",
+            ManagedTunnelName = "delta-public",
+            ManagedIngressClassName = "traefik-cloudflare-tunnel",
+            IngressTargetUrl = new Uri("https://default.edge-system.svc.cluster.local"),
+            ManagedFinalizerName = "edge.promethix.net/tunnelpublichostname-protection",
+            OwnershipConfigMapNamespace = "edge-system",
+            OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",
+        };
+        configure?.Invoke(kubernetesOptions);
+
         return new KubernetesTunnelPublicHostnameClient(
             kubernetes: null!,
-            Options.Create(new KubernetesOperatorOptions
-            {
-                ManagedClassName = "public",
-                ManagedTunnelName = "delta-public",
-                ManagedIngressClassName = "traefik-cloudflare-tunnel",
-                IngressTargetUrl = new Uri("https://default.edge-system.svc.cluster.local"),
-                ManagedFinalizerName = "edge.promethix.net/tunnelpublichostname-protection",
-                OwnershipConfigMapNamespace = "edge-system",
-                OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",
-            }),
+            Options.Create(kubernetesOptions),
             Options.Create(new RoutingOperatorOptions
             {
                 OwnershipTag = "promethix-cloudflare-tunnel-operator",

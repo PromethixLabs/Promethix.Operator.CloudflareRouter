@@ -281,7 +281,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
             : string.Equals(target.Mode.Trim(), "ingress", StringComparison.OrdinalIgnoreCase)
                 ? await ToIngressRouteAsync(resource, target, ownershipTag, cancellationToken).ConfigureAwait(false)
                 : string.Equals(target.Mode.Trim(), "direct", StringComparison.OrdinalIgnoreCase)
-                    ? ToDirectRoute(resource, target, ownershipTag)
+                    ? ToDirectRoute(resource, target, ownershipTag, options.Value.AllowCrossNamespaceDirectTargets)
                     : throw new InvalidOperationException($"Unsupported target mode '{target.Mode}'.");
     }
 
@@ -321,13 +321,20 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     private static PublicHostnameRoute ToDirectRoute(
         TunnelPublicHostnameCustomResource resource,
         TunnelTargetSpec target,
-        string ownershipTag)
+        string ownershipTag,
+        bool allowCrossNamespaceDirectTargets)
     {
         var direct = target.Direct
             ?? throw new InvalidOperationException("spec.target.direct is required when spec.target.mode=direct.");
 
         if (direct.Service is not null)
         {
+            EnsureServiceTargetNamespaceAllowed(
+                resource,
+                direct.Service,
+                "spec.target.direct.service",
+                allowCrossNamespaceDirectTargets);
+
             var targetUrl = ResolveServiceTargetUrl(direct.Service, "spec.target.direct.service");
             var serviceProtocol = string.Equals(targetUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                 ? RouteProtocol.Https
@@ -360,7 +367,28 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     {
         return ingress.Service is null
             ? options.Value.IngressTargetUrl
-            : ResolveServiceTargetUrl(ingress.Service, "spec.target.ingress.service");
+            : options.Value.AllowIngressServiceOverride
+                ? ResolveServiceTargetUrl(ingress.Service, "spec.target.ingress.service")
+                : throw new InvalidOperationException("spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
+    }
+
+    private static void EnsureServiceTargetNamespaceAllowed(
+        TunnelPublicHostnameCustomResource resource,
+        TunnelIngressServiceTargetSpec service,
+        string fieldPath,
+        bool allowCrossNamespace)
+    {
+        if (allowCrossNamespace)
+        {
+            return;
+        }
+
+        var resourceNamespace = resource.Metadata.NamespaceProperty ?? string.Empty;
+
+        if (!string.Equals(service.Namespace, resourceNamespace, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"{fieldPath}.namespace must match the TunnelPublicHostname namespace unless cross-namespace direct targets are explicitly enabled.");
+        }
     }
 
     private static Uri ResolveServiceTargetUrl(TunnelIngressServiceTargetSpec service, string fieldPath)
