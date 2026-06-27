@@ -97,6 +97,26 @@ To install from a local checkout instead, replace the chart reference with `./ch
 
 For GitOps deployments, use the sample manifests in [examples/flux](examples/flux) as a starting point.
 
+## Verifying Images
+
+Container images are signed with cosign. The public verification key is published at:
+
+```text
+https://trust.promethix.dev/cosign/promethix-code-signing.pub
+```
+
+Verify an image by digest:
+
+```powershell
+curl.exe -fsSLO https://trust.promethix.dev/cosign/promethix-code-signing.pub
+
+cosign verify `
+  --key promethix-code-signing.pub `
+  ghcr.io/promethixlabs/cloudflare-tunnel-operator@sha256:<digest>
+```
+
+Use immutable digests for verification rather than mutable tags such as `latest`.
+
 ## Development
 
 ```powershell
