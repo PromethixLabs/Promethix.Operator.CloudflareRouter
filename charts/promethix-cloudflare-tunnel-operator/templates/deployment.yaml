@@ -64,9 +64,23 @@ spec:
               value: {{ .Values.operator.applyChanges | quote }}
             - name: RoutingOperator__ReconciliationIntervalSeconds
               value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
+            - name: AdmissionWebhook__Enabled
+              value: {{ .Values.webhook.enabled | quote }}
+            - name: AdmissionWebhook__Port
+              value: {{ .Values.webhook.port | quote }}
+            - name: AdmissionWebhook__Path
+              value: {{ .Values.webhook.path | quote }}
+            - name: AdmissionWebhook__CertificatePath
+              value: "/tls/tls.crt"
+            - name: AdmissionWebhook__PrivateKeyPath
+              value: "/tls/tls.key"
           ports:
             - containerPort: 8080
               name: http
+{{- if .Values.webhook.enabled }}
+            - containerPort: {{ .Values.webhook.port }}
+              name: webhook
+{{- end }}
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -75,5 +89,17 @@ spec:
             httpGet:
               path: /health/live
               port: http
+{{- if .Values.webhook.enabled }}
+          volumeMounts:
+            - name: webhook-tls
+              mountPath: /tls
+              readOnly: true
+{{- end }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
+{{- if .Values.webhook.enabled }}
+      volumes:
+        - name: webhook-tls
+          secret:
+            secretName: {{ .Values.webhook.certificate.secretName }}
+{{- end }}

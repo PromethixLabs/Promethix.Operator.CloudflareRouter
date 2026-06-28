@@ -11,6 +11,9 @@ serviceAccount:
   create: true
   name: ""
 
+service:
+  port: 8080
+
 cloudflare:
   existingSecretName: cloudflare-tunnel-operator
   apiTokenKey: CLOUDFLARE_API_TOKEN
@@ -32,6 +35,18 @@ operator:
   ownershipConfigMapName: promethix-cloudflare-tunnel-operator-ownership
   applyChanges: false
   reconciliationIntervalSeconds: 30
+
+webhook:
+  enabled: false
+  port: 8443
+  path: /admission/validate-tunnelpublichostname
+  failurePolicy: Fail
+  certificate:
+    secretName: promethix-cloudflare-tunnel-operator-webhook-tls
+    issuerRef:
+      name: ""
+      kind: ClusterIssuer
+      group: cert-manager.io
 
 resources:
   requests:

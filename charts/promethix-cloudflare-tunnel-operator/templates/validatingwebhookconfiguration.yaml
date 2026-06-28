@@ -1,0 +1,26 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}/{{ include "promethix-cloudflare-tunnel-operator.name" . }}-webhook
+webhooks:
+  - name: tunnelpublichostnames.edge.promethix.net
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: {{ .Values.webhook.failurePolicy }}
+    matchPolicy: Equivalent
+    clientConfig:
+      service:
+        namespace: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}
+        name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
+        path: {{ .Values.webhook.path | quote }}
+        port: {{ .Values.webhook.port }}
+    rules:
+      - apiGroups: ["edge.promethix.net"]
+        apiVersions: ["v1alpha1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["tunnelpublichostnames"]
+        scope: "Namespaced"
+{{- end }}
