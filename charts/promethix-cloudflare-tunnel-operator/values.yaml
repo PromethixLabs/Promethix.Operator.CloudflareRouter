@@ -29,6 +29,7 @@ operator:
   allowCrossNamespaceDirectTargets: false
   enforceNamespaceHostnamePolicy: false
   allowedHostnameSuffixesAnnotation: edge.promethix.net/allowed-hostname-suffixes
+  allowedHostnameSuffixes: ""
   managedFinalizerName: edge.promethix.net/tunnelpublichostname-protection
   ownershipTag: promethix-cloudflare-tunnel-operator
   ownershipConfigMapNamespace: cloudflare-tunnel-operator-system

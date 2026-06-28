@@ -22,6 +22,8 @@ public sealed class KubernetesOperatorOptions
 
     public string AllowedHostnameSuffixesAnnotation { get; set; } = AllowedHostnameSuffixesAnnotationDefault;
 
+    public string AllowedHostnameSuffixes { get; set; } = string.Empty;
+
     public string ManagedFinalizerName { get; set; } = "edge.promethix.net/tunnelpublichostname-protection";
 
     public string OwnershipConfigMapNamespace { get; set; } = "cloudflare-tunnel-operator-system";

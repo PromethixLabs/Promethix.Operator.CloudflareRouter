@@ -57,6 +57,14 @@ internal sealed class KubernetesOperatorOptionsValidator : IValidateOptions<Kube
             failures.Add("KubernetesOperator:AllowedHostnameSuffixesAnnotation is required when KubernetesOperator:EnforceNamespaceHostnamePolicy is enabled.");
         }
 
+        var configuredAllowedSuffixes = options.AllowedHostnameSuffixes
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (configuredAllowedSuffixes.Any(string.IsNullOrWhiteSpace))
+        {
+            failures.Add("KubernetesOperator:AllowedHostnameSuffixes must not contain empty values.");
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

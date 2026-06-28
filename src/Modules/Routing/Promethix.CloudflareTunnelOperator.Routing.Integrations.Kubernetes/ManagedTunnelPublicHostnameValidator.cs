@@ -21,6 +21,7 @@ public sealed class ManagedTunnelPublicHostnameValidator(
     {
         ArgumentNullException.ThrowIfNull(resource);
 
+        ValidateAllowedHostnameSuffixes(resource);
         await hostnameOwnershipValidator.ValidateAsync(resource, cancellationToken).ConfigureAwait(false);
 
         var target = resource.Spec.Target;
@@ -42,6 +43,28 @@ public sealed class ManagedTunnelPublicHostnameValidator(
         }
 
         throw new InvalidOperationException($"Unsupported target mode '{target.Mode}'.");
+    }
+
+    private void ValidateAllowedHostnameSuffixes(TunnelPublicHostnameCustomResource resource)
+    {
+        var configuredSuffixes = options.Value.AllowedHostnameSuffixes
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+        if (configuredSuffixes.Length == 0)
+        {
+            return;
+        }
+
+        var hostname = resource.Spec.Hostname.Trim().TrimEnd('.');
+        var allowed = configuredSuffixes.Any(suffix => HostnameMatchesSuffix(hostname, suffix));
+
+        if (!allowed)
+        {
+            throw new InvalidOperationException(
+                $"Hostname '{resource.Spec.Hostname}' is not permitted by operator policy. Allowed suffixes: {string.Join(", ", configuredSuffixes)}.");
+        }
     }
 
     private async Task ValidateIngressAsync(
@@ -123,5 +146,14 @@ public sealed class ManagedTunnelPublicHostnameValidator(
         {
             throw new InvalidOperationException($"{fieldPath}.namespace must match the TunnelPublicHostname namespace unless cross-namespace direct targets are explicitly enabled.");
         }
+    }
+
+    private static bool HostnameMatchesSuffix(string hostname, string suffix)
+    {
+        var normalizedHostname = hostname.Trim().TrimEnd('.').ToUpperInvariant();
+        var normalizedSuffix = suffix.Trim().TrimStart('.').ToUpperInvariant();
+
+        return string.Equals(normalizedHostname, normalizedSuffix, StringComparison.OrdinalIgnoreCase)
+               || normalizedHostname.EndsWith($".{normalizedSuffix}", StringComparison.OrdinalIgnoreCase);
     }
 }

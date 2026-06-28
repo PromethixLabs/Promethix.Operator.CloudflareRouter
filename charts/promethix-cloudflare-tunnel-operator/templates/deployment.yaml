@@ -50,6 +50,8 @@ spec:
               value: {{ .Values.operator.enforceNamespaceHostnamePolicy | quote }}
             - name: KubernetesOperator__AllowedHostnameSuffixesAnnotation
               value: {{ .Values.operator.allowedHostnameSuffixesAnnotation | quote }}
+            - name: KubernetesOperator__AllowedHostnameSuffixes
+              value: {{ .Values.operator.allowedHostnameSuffixes | quote }}
             - name: KubernetesOperator__ManagedFinalizerName
               value: {{ .Values.operator.managedFinalizerName | quote }}
             - name: KubernetesOperator__OwnershipConfigMapNamespace
