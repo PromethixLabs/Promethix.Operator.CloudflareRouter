@@ -80,7 +80,11 @@ internal sealed class OperatorWorker(
     private async Task RunFullIterationAsync(CancellationToken cancellationToken)
     {
         var result = await reconciler.ReconcileAsync(options.Value, cancellationToken).ConfigureAwait(false);
-        state.MarkReconciliationCompleted(result.CompletedAt);
+        state.MarkInitialFullInventoryPass(
+            result.CompletedAt,
+            startupSafeForMutation: !result.ApplyBlocked,
+            result.ApplyBlockReason,
+            result.ApplyBlockMessage);
         await EnsureManagedFinalizersAsync(result, cancellationToken).ConfigureAwait(false);
         await statusUpdater.UpdateAsync(result, failure: null, cancellationToken).ConfigureAwait(false);
 

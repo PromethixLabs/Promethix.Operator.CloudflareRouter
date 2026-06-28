@@ -35,6 +35,10 @@ operator:
   ownershipConfigMapNamespace: cloudflare-tunnel-operator-system
   ownershipConfigMapName: promethix-cloudflare-tunnel-operator-ownership
   applyChanges: false
+  mutationMode: Full
+  startupProtectionEnabled: true
+  maxDeleteCount: 5
+  maxDeletePercentage: 50
   reconciliationIntervalSeconds: 30
 
 webhook:

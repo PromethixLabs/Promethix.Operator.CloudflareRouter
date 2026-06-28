@@ -21,6 +21,21 @@ internal sealed class RoutingOperatorOptionsValidator : IValidateOptions<Routing
             failures.Add("RoutingOperator:ReconciliationIntervalSeconds must be greater than zero.");
         }
 
+        if (!Enum.TryParse<RouteMutationMode>(options.MutationMode, ignoreCase: true, out _))
+        {
+            failures.Add("RoutingOperator:MutationMode must be one of Full, CreateUpdateOnly, or CreateOnly.");
+        }
+
+        if (options.MaxDeleteCount < -1)
+        {
+            failures.Add("RoutingOperator:MaxDeleteCount must be -1 or greater.");
+        }
+
+        if (options.MaxDeletePercentage is < -1 or > 100)
+        {
+            failures.Add("RoutingOperator:MaxDeletePercentage must be between 0 and 100, or -1 to disable.");
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

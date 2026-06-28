@@ -6,6 +6,7 @@ namespace Promethix.CloudflareTunnelOperator.Hosting.Reconciliation;
 internal sealed class RouteIntentWatchService(
     IKubernetes kubernetes,
     RouteIntentWorkQueue workQueue,
+    OperatorState state,
     ILogger<RouteIntentWatchService> logger) : BackgroundService
 {
     private static readonly TimeSpan WatchReconnectDelay = TimeSpan.FromSeconds(5);
@@ -65,8 +66,14 @@ internal sealed class RouteIntentWatchService(
         {
             var @namespace = resource.Metadata.NamespaceProperty ?? string.Empty;
             var name = resource.Metadata.Name ?? string.Empty;
+            var initialWatchActivity = state.MarkWatchActivityObserved();
 
             LogWatchEvent(logger, eventType.ToString(), @namespace, name, null);
+
+            if (initialWatchActivity)
+            {
+                workQueue.EnqueueFullResync("watch-initialized");
+            }
 
             if (!string.IsNullOrWhiteSpace(@namespace) && !string.IsNullOrWhiteSpace(name))
             {

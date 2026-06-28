@@ -61,6 +61,7 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<RouteReconciler>();
 builder.Services.AddSingleton<OperatorState>();
 builder.Services.AddSingleton<RouteIntentWorkQueue>();
+builder.Services.AddSingleton<IRouteMutationSafetyEvaluator, RouteMutationSafetyEvaluator>();
 builder.Services.AddSingleton(_ => KubernetesClientFactory.Create());
 builder.Services.AddSingleton<IIngressTargetValidator, KubernetesIngressTargetValidator>();
 builder.Services.AddSingleton<IKubernetesNamespaceReader, KubernetesNamespaceReader>();

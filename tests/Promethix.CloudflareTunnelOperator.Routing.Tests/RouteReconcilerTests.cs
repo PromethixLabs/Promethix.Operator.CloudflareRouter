@@ -28,6 +28,7 @@ public sealed class RouteReconcilerTests
         var reconciler = new RouteReconciler(
             new StubIntentSource(intent),
             new ThrowingRouteClient(new InvalidOperationException("Cloudflare read failed.")),
+            new AllowingMutationSafetyEvaluator(),
             new StubClock(DateTimeOffset.Parse("2026-06-04T10:00:00Z", CultureInfo.InvariantCulture)));
 
         var act = () => reconciler.ReconcileAsync(
@@ -61,6 +62,36 @@ public sealed class RouteReconcilerTests
         public Task ApplyAsync(RoutePlan plan, CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class AllowingMutationSafetyEvaluator : IRouteMutationSafetyEvaluator
+    {
+        public Task<RouteMutationSafetyDecision> EvaluateFullReconcileAsync(
+            RoutingOperatorOptions options,
+            RouteIntentDocument intent,
+            RoutePlan plan,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new RouteMutationSafetyDecision(true));
+        }
+
+        public Task<RouteMutationSafetyDecision> EvaluateManagedRouteReconcileAsync(
+            RoutingOperatorOptions options,
+            ManagedRouteIntent intent,
+            RoutePlan plan,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new RouteMutationSafetyDecision(true));
+        }
+
+        public Task<RouteMutationSafetyDecision> EvaluateCleanupAsync(
+            RoutingOperatorOptions options,
+            string hostname,
+            RoutePlan plan,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new RouteMutationSafetyDecision(true));
         }
     }
 

@@ -3,6 +3,7 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Application;
 public sealed class RouteReconciler(
     IClusterRouteIntentSource intentSource,
     ICloudflareTunnelRouteClient routeClient,
+    IRouteMutationSafetyEvaluator mutationSafetyEvaluator,
     IClock clock)
 {
     public async Task<ReconciliationResult> ReconcileAsync(RoutingOperatorOptions options, CancellationToken cancellationToken)
@@ -15,8 +16,15 @@ public sealed class RouteReconciler(
         {
             var actualRoutes = await routeClient.GetRoutesAsync(cancellationToken).ConfigureAwait(false);
             var plan = RoutePlanner.BuildPlan(intent.Routes, actualRoutes, options.OwnershipTag);
+            var decision = await mutationSafetyEvaluator
+                .EvaluateFullReconcileAsync(options, intent, plan, cancellationToken)
+                .ConfigureAwait(false);
+            var canApply = options.ApplyChanges
+                && plan.HasChanges
+                && plan.Conflicts.Count == 0
+                && decision.AllowApply;
 
-            if (options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0)
+            if (canApply)
             {
                 await routeClient.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
             }
@@ -26,7 +34,10 @@ public sealed class RouteReconciler(
                 clock.UtcNow,
                 intent,
                 plan,
-                options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0);
+                canApply,
+                ApplyBlocked: options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0 && !decision.AllowApply,
+                ApplyBlockReason: decision.Reason,
+                ApplyBlockMessage: decision.Message);
         }
         catch (OperationCanceledException)
         {
@@ -55,8 +66,15 @@ public sealed class RouteReconciler(
         {
             var actualRoutes = await routeClient.GetRoutesAsync(cancellationToken).ConfigureAwait(false);
             var plan = RoutePlanner.BuildManagePlan(intent.Route, actualRoutes, options.OwnershipTag);
+            var decision = await mutationSafetyEvaluator
+                .EvaluateManagedRouteReconcileAsync(options, intent, plan, cancellationToken)
+                .ConfigureAwait(false);
+            var canApply = options.ApplyChanges
+                && plan.HasChanges
+                && plan.Conflicts.Count == 0
+                && decision.AllowApply;
 
-            if (options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0)
+            if (canApply)
             {
                 await routeClient.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
             }
@@ -66,7 +84,10 @@ public sealed class RouteReconciler(
                 clock.UtcNow,
                 document,
                 plan,
-                options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0);
+                canApply,
+                ApplyBlocked: options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0 && !decision.AllowApply,
+                ApplyBlockReason: decision.Reason,
+                ApplyBlockMessage: decision.Message);
         }
         catch (OperationCanceledException)
         {
@@ -90,8 +111,15 @@ public sealed class RouteReconciler(
 
         var actualRoutes = await routeClient.GetRoutesAsync(cancellationToken).ConfigureAwait(false);
         var plan = RoutePlanner.BuildCleanupPlan(hostname, actualRoutes, options.OwnershipTag);
+        var decision = await mutationSafetyEvaluator
+            .EvaluateCleanupAsync(options, hostname, plan, cancellationToken)
+            .ConfigureAwait(false);
+        var canApply = options.ApplyChanges
+            && plan.HasChanges
+            && plan.Conflicts.Count == 0
+            && decision.AllowApply;
 
-        if (options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0)
+        if (canApply)
         {
             await routeClient.ApplyAsync(plan, cancellationToken).ConfigureAwait(false);
         }
@@ -99,6 +127,9 @@ public sealed class RouteReconciler(
         return new RouteCleanupResult(
             hostname,
             plan,
-            options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0);
+            canApply,
+            ApplyBlocked: options.ApplyChanges && plan.HasChanges && plan.Conflicts.Count == 0 && !decision.AllowApply,
+            ApplyBlockReason: decision.Reason,
+            ApplyBlockMessage: decision.Message);
     }
 }

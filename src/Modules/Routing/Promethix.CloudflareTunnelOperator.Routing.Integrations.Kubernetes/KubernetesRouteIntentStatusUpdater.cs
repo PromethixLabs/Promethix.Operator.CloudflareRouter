@@ -60,6 +60,12 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 readyReason = "Conflict";
                 readyMessage = "Hostname exists in Cloudflare but is not owned by this operator.";
             }
+            else if (result.ApplyBlocked)
+            {
+                readyStatus = "False";
+                readyReason = result.ApplyBlockReason ?? "ApplyBlocked";
+                readyMessage = result.ApplyBlockMessage ?? "Route change blocked by operator safety policy.";
+            }
             else if (!result.ChangesApplied && plannedHostnames.Contains(intent.Route.Hostname))
             {
                 readyStatus = "False";

@@ -7,4 +7,7 @@ public sealed record ReconciliationResult(
     DateTimeOffset CompletedAt,
     RouteIntentDocument Intent,
     RoutePlan Plan,
-    bool ChangesApplied);
+    bool ChangesApplied,
+    bool ApplyBlocked = false,
+    string? ApplyBlockReason = null,
+    string? ApplyBlockMessage = null);

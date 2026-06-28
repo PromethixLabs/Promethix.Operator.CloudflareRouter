@@ -64,6 +64,14 @@ spec:
               value: {{ .Values.operator.ownershipTag | quote }}
             - name: RoutingOperator__ApplyChanges
               value: {{ .Values.operator.applyChanges | quote }}
+            - name: RoutingOperator__MutationMode
+              value: {{ .Values.operator.mutationMode | quote }}
+            - name: RoutingOperator__StartupProtectionEnabled
+              value: {{ .Values.operator.startupProtectionEnabled | quote }}
+            - name: RoutingOperator__MaxDeleteCount
+              value: {{ .Values.operator.maxDeleteCount | quote }}
+            - name: RoutingOperator__MaxDeletePercentage
+              value: {{ .Values.operator.maxDeletePercentage | quote }}
             - name: RoutingOperator__ReconciliationIntervalSeconds
               value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
             - name: AdmissionWebhook__Enabled
