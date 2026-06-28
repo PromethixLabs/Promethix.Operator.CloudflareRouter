@@ -26,6 +26,7 @@ The preferred path is ingress-backed:
 Direct origin publication is also supported for cases where going through ingress is not appropriate.
 
 For multi-tenant safety, direct service targets are restricted to the same namespace as the `TunnelPublicHostname` by default. Per-resource ingress service overrides are also disabled by default; ingress mode normally uses the operator's configured `ingressTargetUrl`.
+If you need stronger hostname tenancy boundaries, enable `operator.enforceNamespaceHostnamePolicy` and annotate namespaces with the hostname suffixes they are allowed to claim, for example `edge.promethix.net/allowed-hostname-suffixes: apps.example.com, internal.example.com`.
 
 ## Project layout
 

@@ -116,6 +116,22 @@ public sealed class TunnelPublicHostnameMappingTests
     }
 
     [Fact]
+    public async Task HostnameClaimIsRejectedWhenNamespacePolicyDeniesIt()
+    {
+        var client = CreateClient(
+            hostnameOwnershipValidator: new RejectingHostnameOwnershipValidator(
+                "Hostname 'whoami.delta.promethix.net' is not permitted for namespace 'demo'. Allowed suffixes: apps.promethix.net."));
+
+        var resource = CreateIngressManagedResource();
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent.Reason.Should().Be("Hostname 'whoami.delta.promethix.net' is not permitted for namespace 'demo'. Allowed suffixes: apps.promethix.net.");
+    }
+
+    [Fact]
     public async Task DirectTargetCanUseServiceReference()
     {
         var client = CreateClient();
@@ -284,6 +300,22 @@ public sealed class TunnelPublicHostnameMappingTests
         }
     }
 
+    private sealed class AcceptingHostnameOwnershipValidator : IHostnameOwnershipValidator
+    {
+        public Task ValidateAsync(TunnelPublicHostnameCustomResource resource, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RejectingHostnameOwnershipValidator(string reason) : IHostnameOwnershipValidator
+    {
+        public Task ValidateAsync(TunnelPublicHostnameCustomResource resource, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException(reason);
+        }
+    }
+
     private static TunnelPublicHostnameCustomResource CreateIngressOverrideResource()
     {
         return new TunnelPublicHostnameCustomResource
@@ -317,7 +349,35 @@ public sealed class TunnelPublicHostnameMappingTests
         };
     }
 
-    private static KubernetesTunnelPublicHostnameClient CreateClient(Action<KubernetesOperatorOptions>? configure = null)
+    private static TunnelPublicHostnameCustomResource CreateIngressManagedResource()
+    {
+        return new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "whoami-public",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "whoami.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "ingress",
+                    Ingress = new TunnelIngressTargetSpec
+                    {
+                        ClassName = "traefik-cloudflare-tunnel",
+                    },
+                },
+            },
+        };
+    }
+
+    private static KubernetesTunnelPublicHostnameClient CreateClient(
+        Action<KubernetesOperatorOptions>? configure = null,
+        IHostnameOwnershipValidator? hostnameOwnershipValidator = null)
     {
         var kubernetesOptions = new KubernetesOperatorOptions
         {
@@ -338,6 +398,7 @@ public sealed class TunnelPublicHostnameMappingTests
             {
                 OwnershipTag = "promethix-cloudflare-tunnel-operator",
             }),
+            hostnameOwnershipValidator ?? new AcceptingHostnameOwnershipValidator(),
             new AcceptingIngressTargetValidator(),
             NullLogger<KubernetesTunnelPublicHostnameClient>.Instance);
     }

@@ -14,6 +14,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     IKubernetes kubernetes,
     IOptions<KubernetesOperatorOptions> options,
     IOptions<RoutingOperatorOptions> routingOptions,
+    IHostnameOwnershipValidator hostnameOwnershipValidator,
     IIngressTargetValidator ingressTargetValidator,
     ILogger<KubernetesTunnelPublicHostnameClient> logger)
 {
@@ -274,6 +275,8 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         string ownershipTag,
         CancellationToken cancellationToken)
     {
+        await hostnameOwnershipValidator.ValidateAsync(resource, cancellationToken).ConfigureAwait(false);
+
         var target = resource.Spec.Target;
 
         return target is null || string.IsNullOrWhiteSpace(target.Mode)

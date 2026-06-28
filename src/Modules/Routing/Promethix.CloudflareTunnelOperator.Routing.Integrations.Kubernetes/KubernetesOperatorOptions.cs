@@ -2,6 +2,8 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 public sealed class KubernetesOperatorOptions
 {
+    public const string AllowedHostnameSuffixesAnnotationDefault = "edge.promethix.net/allowed-hostname-suffixes";
+
     public const string SectionName = "KubernetesOperator";
 
     public string ManagedClassName { get; set; } = "public";
@@ -15,6 +17,10 @@ public sealed class KubernetesOperatorOptions
     public bool AllowIngressServiceOverride { get; set; }
 
     public bool AllowCrossNamespaceDirectTargets { get; set; }
+
+    public bool EnforceNamespaceHostnamePolicy { get; set; }
+
+    public string AllowedHostnameSuffixesAnnotation { get; set; } = AllowedHostnameSuffixesAnnotationDefault;
 
     public string ManagedFinalizerName { get; set; } = "edge.promethix.net/tunnelpublichostname-protection";
 

@@ -46,6 +46,10 @@ spec:
               value: {{ .Values.operator.allowIngressServiceOverride | quote }}
             - name: KubernetesOperator__AllowCrossNamespaceDirectTargets
               value: {{ .Values.operator.allowCrossNamespaceDirectTargets | quote }}
+            - name: KubernetesOperator__EnforceNamespaceHostnamePolicy
+              value: {{ .Values.operator.enforceNamespaceHostnamePolicy | quote }}
+            - name: KubernetesOperator__AllowedHostnameSuffixesAnnotation
+              value: {{ .Values.operator.allowedHostnameSuffixesAnnotation | quote }}
             - name: KubernetesOperator__ManagedFinalizerName
               value: {{ .Values.operator.managedFinalizerName | quote }}
             - name: KubernetesOperator__OwnershipConfigMapNamespace

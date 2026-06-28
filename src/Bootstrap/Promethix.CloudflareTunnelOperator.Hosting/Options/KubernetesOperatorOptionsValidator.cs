@@ -51,6 +51,12 @@ internal sealed class KubernetesOperatorOptionsValidator : IValidateOptions<Kube
             failures.Add("KubernetesOperator:OwnershipConfigMapName is required.");
         }
 
+        if (options.EnforceNamespaceHostnamePolicy
+            && string.IsNullOrWhiteSpace(options.AllowedHostnameSuffixesAnnotation))
+        {
+            failures.Add("KubernetesOperator:AllowedHostnameSuffixesAnnotation is required when KubernetesOperator:EnforceNamespaceHostnamePolicy is enabled.");
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }
