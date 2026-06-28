@@ -66,8 +66,8 @@ helm repo add promethix https://promethixlabs.github.io/charts
 helm repo update
 ```
 
-Charts are published from release tags. Production promotion creates the release tag used for chart publishing.
-Stable chart versions are plain SemVer, for example `1.0.43`. Prerelease chart versions, if published, use SemVer prerelease tags such as `1.0.44-alpha-abc1234.44` and are only shown by Helm when using `--devel`.
+Charts are published from Git release tags. Release-candidate promotion creates prerelease chart tags such as `1.0.44-rc1`, and production promotion creates the stable release tag.
+Stable chart versions are plain SemVer, for example `1.0.43`. Prerelease chart versions are only shown by Helm when using `--devel`.
 
 Create a namespace and a Secret containing Cloudflare credentials:
 
