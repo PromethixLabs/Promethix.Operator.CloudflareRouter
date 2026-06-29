@@ -16,6 +16,8 @@ public sealed class KubernetesOperatorOptions
 
     public bool AllowIngressServiceOverride { get; set; }
 
+    public string IngressServiceOverrideMode { get; set; } = nameof(global::Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes.IngressServiceOverrideMode.Disabled);
+
     public bool AllowCrossNamespaceDirectTargets { get; set; }
 
     public bool EnforceNamespaceHostnamePolicy { get; set; }

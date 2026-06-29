@@ -87,13 +87,36 @@ public sealed class ManagedTunnelPublicHostnameValidator(
         }
 
         if (ingress.Service is not null
-            && !options.Value.AllowIngressServiceOverride
-            && !MatchesConfiguredIngressTarget(ingress.Service, options.Value.IngressTargetUrl))
+            && !IsIngressServiceOverrideAllowed(ingress.Service))
         {
-            throw new InvalidOperationException("spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
+            throw new InvalidOperationException(
+                "spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
         }
 
         await ingressTargetValidator.ValidateAsync(resource, ingress, cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool IsIngressServiceOverrideAllowed(TunnelIngressServiceTargetSpec service)
+    {
+        if (!Enum.TryParse<IngressServiceOverrideMode>(options.Value.IngressServiceOverrideMode, ignoreCase: true, out var mode))
+        {
+            mode = options.Value.AllowIngressServiceOverride
+                ? IngressServiceOverrideMode.Any
+                : IngressServiceOverrideMode.Disabled;
+        }
+
+        if (mode == IngressServiceOverrideMode.Disabled && options.Value.AllowIngressServiceOverride)
+        {
+            mode = IngressServiceOverrideMode.Any;
+        }
+
+        return mode switch
+        {
+            IngressServiceOverrideMode.Disabled => false,
+            IngressServiceOverrideMode.ConfiguredTargetOnly => MatchesConfiguredIngressTarget(service, options.Value.IngressTargetUrl),
+            IngressServiceOverrideMode.Any => true,
+            _ => false,
+        };
     }
 
     private static void ValidateDirect(

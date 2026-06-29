@@ -44,6 +44,8 @@ spec:
               value: {{ .Values.operator.ingressTargetUrl | quote }}
             - name: KubernetesOperator__AllowIngressServiceOverride
               value: {{ .Values.operator.allowIngressServiceOverride | quote }}
+            - name: KubernetesOperator__IngressServiceOverrideMode
+              value: {{ .Values.operator.ingressServiceOverrideMode | quote }}
             - name: KubernetesOperator__AllowCrossNamespaceDirectTargets
               value: {{ .Values.operator.allowCrossNamespaceDirectTargets | quote }}
             - name: KubernetesOperator__EnforceNamespaceHostnamePolicy
@@ -114,4 +116,5 @@ spec:
         - name: webhook-tls
           secret:
             secretName: {{ .Values.webhook.certificate.secretName }}
+            optional: true
 {{- end }}

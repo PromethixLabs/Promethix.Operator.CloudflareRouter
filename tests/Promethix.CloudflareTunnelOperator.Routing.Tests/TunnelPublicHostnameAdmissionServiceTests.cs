@@ -116,7 +116,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         _ = response.Response.Should().NotBeNull();
         _ = response.Response.Allowed.Should().BeFalse();
         _ = response.Response.Status!.Message.Should().Be(
-            "spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
+            "spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
     }
 
     private static TunnelPublicHostnameAdmissionService CreateService()
@@ -128,6 +128,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
                 ManagedTunnelName = "delta-public",
                 ManagedIngressClassName = "traefik-cloudflare-tunnel",
                 IngressTargetUrl = new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local"),
+                IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.ConfiguredTargetOnly),
                 ManagedFinalizerName = "edge.promethix.net/tunnelpublichostname-protection",
                 OwnershipConfigMapNamespace = "edge-system",
                 OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",

@@ -36,6 +36,11 @@ internal sealed class KubernetesOperatorOptionsValidator : IValidateOptions<Kube
             failures.Add("KubernetesOperator:IngressTargetUrl must use http or https.");
         }
 
+        if (!Enum.TryParse<IngressServiceOverrideMode>(options.IngressServiceOverrideMode, ignoreCase: true, out _))
+        {
+            failures.Add("KubernetesOperator:IngressServiceOverrideMode must be one of Disabled, ConfiguredTargetOnly, or Any.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.ManagedFinalizerName))
         {
             failures.Add("KubernetesOperator:ManagedFinalizerName is required.");

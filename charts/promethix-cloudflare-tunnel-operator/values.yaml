@@ -26,6 +26,7 @@ operator:
   managedIngressClassName: traefik-cloudflare-tunnel
   ingressTargetUrl: https://traefik-cloudflare-tunnel.traefik.svc.cluster.local
   allowIngressServiceOverride: false
+  ingressServiceOverrideMode: Disabled
   allowCrossNamespaceDirectTargets: false
   enforceNamespaceHostnamePolicy: true
   allowedHostnameSuffixesAnnotation: edge.promethix.net/allowed-hostname-suffixes

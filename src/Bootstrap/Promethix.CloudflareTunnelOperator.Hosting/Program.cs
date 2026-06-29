@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -24,19 +25,30 @@ var admissionWebhookOptions = builder.Configuration
     .GetSection(AdmissionWebhookOptions.SectionName)
     .Get<AdmissionWebhookOptions>() ?? new AdmissionWebhookOptions();
 
+var webhookRuntimeState = new AdmissionWebhookRuntimeState
+{
+    Enabled = admissionWebhookOptions.Enabled,
+};
+builder.Services.AddSingleton(webhookRuntimeState);
+
 if (admissionWebhookOptions.Enabled)
 {
     _ = builder.WebHost.ConfigureKestrel(options =>
     {
         options.ListenAnyIP(admissionWebhookOptions.ManagementPort);
-        options.ListenAnyIP(admissionWebhookOptions.Port, listenOptions =>
+        if (TryLoadWebhookCertificate(admissionWebhookOptions, out var certificate, out var failureReason))
         {
-            var certificate = X509Certificate2.CreateFromPemFile(
-                admissionWebhookOptions.CertificatePath,
-                admissionWebhookOptions.PrivateKeyPath);
-
-            _ = listenOptions.UseHttps(certificate);
-        });
+            webhookRuntimeState.ListenerReady = true;
+            options.ListenAnyIP(admissionWebhookOptions.Port, listenOptions =>
+            {
+                _ = listenOptions.UseHttps(certificate);
+            });
+        }
+        else
+        {
+            webhookRuntimeState.ListenerReady = false;
+            webhookRuntimeState.FailureReason = failureReason;
+        }
     });
 }
 
@@ -120,3 +132,30 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 });
 
 app.Run();
+
+static bool TryLoadWebhookCertificate(
+    AdmissionWebhookOptions options,
+    out X509Certificate2 certificate,
+    out string failureReason)
+{
+    certificate = null!;
+    failureReason = string.Empty;
+
+    if (!File.Exists(options.CertificatePath) || !File.Exists(options.PrivateKeyPath))
+    {
+        failureReason =
+            $"Admission webhook TLS files were not found at '{options.CertificatePath}' and '{options.PrivateKeyPath}'.";
+        return false;
+    }
+
+    try
+    {
+        certificate = X509Certificate2.CreateFromPemFile(options.CertificatePath, options.PrivateKeyPath);
+        return true;
+    }
+    catch (CryptographicException ex)
+    {
+        failureReason = $"Admission webhook TLS material could not be loaded: {ex.Message}";
+        return false;
+    }
+}

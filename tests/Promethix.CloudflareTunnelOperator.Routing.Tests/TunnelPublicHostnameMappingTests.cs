@@ -62,7 +62,11 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task IngressTargetCanOverrideDefaultService()
     {
-        var client = CreateClient(options => options.AllowIngressServiceOverride = true);
+        var client = CreateClient(options =>
+        {
+            options.AllowIngressServiceOverride = true;
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.Any);
+        });
 
         var resource = new TunnelPublicHostnameCustomResource
         {
@@ -112,15 +116,16 @@ public sealed class TunnelPublicHostnameMappingTests
 
         _ = managedIntent.Should().BeNull();
         _ = invalidIntent.Should().NotBeNull();
-        _ = invalidIntent.Reason.Should().Be("spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
+        _ = invalidIntent.Reason.Should().Be("spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
     }
 
     [Fact]
-    public async Task IngressServiceMatchingConfiguredTargetIsAllowedByDefault()
+    public async Task IngressServiceMatchingConfiguredTargetIsAllowedWhenModeIsConfiguredTargetOnly()
     {
         var client = CreateClient(options =>
         {
             options.IngressTargetUrl = new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443");
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.ConfiguredTargetOnly);
         });
 
         var resource = CreateIngressOverrideResource();
@@ -130,6 +135,25 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = managedIntent.Should().NotBeNull();
         Assert.NotNull(managedIntent);
         _ = managedIntent.Route.OriginService.Should().Be(new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443"));
+    }
+
+    [Fact]
+    public async Task ArbitraryIngressServiceOverrideIsRejectedWhenModeIsConfiguredTargetOnly()
+    {
+        var client = CreateClient(options =>
+        {
+            options.IngressTargetUrl = new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443");
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.ConfiguredTargetOnly);
+        });
+
+        var resource = CreateIngressOverrideResource();
+        resource.Spec.Target!.Ingress!.Service!.Name = "other-ingress";
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent.Reason.Should().Be("spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
     }
 
     [Fact]

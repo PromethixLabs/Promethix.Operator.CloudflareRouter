@@ -6,6 +6,7 @@ metadata:
   namespace: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}
 spec:
   secretName: {{ .Values.webhook.certificate.secretName }}
+  commonName: {{ include "promethix-cloudflare-tunnel-operator.name" . }}.{{ include "promethix-cloudflare-tunnel-operator.namespace" . }}.svc
   issuerRef:
     name: {{ include "promethix-cloudflare-tunnel-operator.webhookIssuerName" . | quote }}
     kind: {{ .Values.webhook.certificate.issuerRef.kind | quote }}

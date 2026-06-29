@@ -30,4 +30,4 @@ Do not commit real Cloudflare credentials in plain text. Use SOPS, External Secr
 - cross-namespace direct targets disabled
 - destructive Cloudflare mutations blocked by default
 - webhook enabled with cert-manager-backed TLS
-- explicit ingress service override disabled, while still allowing a CR to specify the same shared ingress target as `operator.ingressTargetUrl`
+- ingress service override mode set to `ConfiguredTargetOnly`, so only the approved shared ingress target is accepted

@@ -53,6 +53,80 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         _ = await act.Should().NotThrowAsync();
     }
 
+    [Fact]
+    public async Task ValidateAsyncAllowsConfiguredIngressTargetOverrideWhenModeIsConfiguredTargetOnly()
+    {
+        var validator = CreateValidator(options =>
+        {
+            options.IngressTargetUrl = new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443");
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.ConfiguredTargetOnly);
+        });
+
+        var resource = CreateIngressResource(
+            "whoami.apps.example.com",
+            new TunnelIngressServiceTargetSpec
+            {
+                Name = "traefik-cloudflare-tunnel",
+                Namespace = "edge-system",
+                Port = 443,
+                Scheme = "https",
+            });
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        _ = await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ValidateAsyncRejectsArbitraryIngressTargetOverrideWhenModeIsConfiguredTargetOnly()
+    {
+        var validator = CreateValidator(options =>
+        {
+            options.IngressTargetUrl = new Uri("https://traefik-cloudflare-tunnel.edge-system.svc.cluster.local:443");
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.ConfiguredTargetOnly);
+        });
+
+        var resource = CreateIngressResource(
+            "whoami.apps.example.com",
+            new TunnelIngressServiceTargetSpec
+            {
+                Name = "other-ingress",
+                Namespace = "edge-system",
+                Port = 443,
+                Scheme = "https",
+            });
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
+    }
+
+    [Fact]
+    public async Task ValidateAsyncAllowsAnyOverrideWhenLegacyBooleanIsEnabled()
+    {
+        var validator = CreateValidator(options =>
+        {
+            options.AllowIngressServiceOverride = true;
+            options.IngressServiceOverrideMode = nameof(IngressServiceOverrideMode.Disabled);
+        });
+
+        var resource = CreateIngressResource(
+            "whoami.apps.example.com",
+            new TunnelIngressServiceTargetSpec
+            {
+                Name = "other-ingress",
+                Namespace = "edge-system",
+                Port = 443,
+                Scheme = "https",
+            });
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        _ = await act.Should().NotThrowAsync();
+    }
+
     private static ManagedTunnelPublicHostnameValidator CreateValidator(Action<KubernetesOperatorOptions>? configure = null)
     {
         var options = new KubernetesOperatorOptions
@@ -74,7 +148,9 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
             new AcceptingIngressTargetValidator());
     }
 
-    private static TunnelPublicHostnameCustomResource CreateIngressResource(string hostname)
+    private static TunnelPublicHostnameCustomResource CreateIngressResource(
+        string hostname,
+        TunnelIngressServiceTargetSpec? service = null)
     {
         return new TunnelPublicHostnameCustomResource
         {
@@ -97,6 +173,7 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
                     Ingress = new TunnelIngressTargetSpec
                     {
                         ClassName = "traefik-cloudflare-tunnel",
+                        Service = service,
                     },
                 },
             },
