@@ -149,6 +149,24 @@ public sealed class TunnelPublicHostnameMappingTests
     }
 
     [Fact]
+    public async Task HostnameClaimIsRejectedWhenOperatorSuffixPolicyDeniesIt()
+    {
+        var client = CreateClient(options =>
+        {
+            options.AllowedHostnameSuffixes = "internal.example.com";
+        });
+
+        var resource = CreateIngressManagedResource();
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent.Reason.Should().Be(
+            "Hostname 'whoami.apps.example.com' is not permitted by operator policy. Allowed suffixes: internal.example.com.");
+    }
+
+    [Fact]
     public async Task DirectTargetCanUseServiceReference()
     {
         var client = CreateClient();

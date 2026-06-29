@@ -38,6 +38,21 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
             "Hostname 'whoami.other.example.net' is not permitted by operator policy. Allowed suffixes: apps.example.com.");
     }
 
+    [Fact]
+    public async Task ValidateAsyncAllowsHostnameWhenOperatorSuffixMatches()
+    {
+        var validator = CreateValidator(options =>
+        {
+            options.AllowedHostnameSuffixes = "apps.example.com";
+        });
+
+        var resource = CreateIngressResource("service.apps.example.com");
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        _ = await act.Should().NotThrowAsync();
+    }
+
     private static ManagedTunnelPublicHostnameValidator CreateValidator(Action<KubernetesOperatorOptions>? configure = null)
     {
         var options = new KubernetesOperatorOptions

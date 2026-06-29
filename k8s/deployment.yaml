@@ -60,6 +60,8 @@ spec:
               value: "true"
             - name: KubernetesOperator__AllowedHostnameSuffixesAnnotation
               value: edge.promethix.net/allowed-hostname-suffixes
+            - name: KubernetesOperator__AllowedHostnameSuffixes
+              value: apps.example.com,internal.example.com
             - name: KubernetesOperator__OwnershipConfigMapNamespace
               value: cloudflare-tunnel-operator-system
             - name: KubernetesOperator__OwnershipConfigMapName

@@ -27,6 +27,7 @@ Direct origin publication is also supported for cases where going through ingres
 
 For multi-tenant safety, direct service targets are restricted to the same namespace as the `TunnelPublicHostname` by default. Per-resource ingress service overrides are also disabled by default; ingress mode normally uses the operator's configured `ingressTargetUrl`.
 Namespace hostname ownership policy is enabled by default. Namespaces must be annotated with the hostname suffixes they are allowed to claim, for example `edge.promethix.net/allowed-hostname-suffixes: apps.example.com, internal.example.com`.
+For shared clusters, set `operator.allowedHostnameSuffixes` as an outer operator-wide allowlist as well. A hostname must satisfy both the operator-wide suffix allowlist and the namespace-specific suffix annotation before it will be accepted.
 For shared clusters, tenant users should usually get namespace-scoped RBAC for `TunnelPublicHostname` in their own namespace rather than broad cluster access.
 
 ## Project layout
@@ -99,6 +100,7 @@ helm upgrade --install cloudflare-tunnel-operator `
   --set cloudflare.existingSecretName=cloudflare-tunnel-operator `
   --set operator.managedTunnelName=public-tunnel `
   --set operator.ingressTargetUrl=https://traefik-cloudflare-tunnel.traefik.svc.cluster.local `
+  --set operator.allowedHostnameSuffixes=apps.example.com,internal.example.com `
   --set operator.applyChanges=false
 ```
 

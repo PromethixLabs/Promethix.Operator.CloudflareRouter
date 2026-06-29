@@ -29,6 +29,6 @@ spec:
       allowCrossNamespaceDirectTargets: false
       enforceNamespaceHostnamePolicy: true
       allowedHostnameSuffixesAnnotation: edge.promethix.net/allowed-hostname-suffixes
-      allowedHostnameSuffixes: ""
+      allowedHostnameSuffixes: "apps.example.com,internal.example.com"
       ownershipConfigMapNamespace: cloudflare-tunnel-operator-system
       applyChanges: false
