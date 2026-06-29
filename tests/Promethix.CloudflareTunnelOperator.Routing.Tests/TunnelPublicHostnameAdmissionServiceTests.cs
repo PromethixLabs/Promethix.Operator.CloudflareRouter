@@ -59,7 +59,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         var response = await service.ValidateAsync(review, CancellationToken.None);
 
         _ = response.Response.Should().NotBeNull();
-        _ = response.Response!.Allowed.Should().BeFalse();
+        _ = response.Response.Allowed.Should().BeFalse();
         _ = response.Response.Status!.Message.Should().Contain("does not match managed ingress class");
     }
 
@@ -87,7 +87,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
 
         _ = response.Response.Should().NotBeNull();
-        _ = response.Response!.Allowed.Should().BeTrue();
+        _ = response.Response.Allowed.Should().BeTrue();
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
 
         _ = response.Response.Should().NotBeNull();
-        _ = response.Response!.Allowed.Should().BeFalse();
+        _ = response.Response.Allowed.Should().BeFalse();
         _ = response.Response.Status!.Message.Should().Be(
             "spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
     }
