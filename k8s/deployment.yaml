@@ -56,6 +56,10 @@ spec:
               value: https://traefik-cloudflare-tunnel.traefik.svc.cluster.local
             - name: KubernetesOperator__ManagedFinalizerName
               value: edge.promethix.net/tunnelpublichostname-protection
+            - name: KubernetesOperator__EnforceNamespaceHostnamePolicy
+              value: "true"
+            - name: KubernetesOperator__AllowedHostnameSuffixesAnnotation
+              value: edge.promethix.net/allowed-hostname-suffixes
             - name: KubernetesOperator__OwnershipConfigMapNamespace
               value: cloudflare-tunnel-operator-system
             - name: KubernetesOperator__OwnershipConfigMapName
