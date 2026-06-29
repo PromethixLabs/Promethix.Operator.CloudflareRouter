@@ -1,0 +1,47 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloudflare-tunnel-operator
+  namespace: cloudflare-tunnel-operator-system
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: promethix-cloudflare-tunnel-operator
+      sourceRef:
+        kind: HelmRepository
+        name: promethix
+        namespace: flux-system
+      version: ">=1.0.0"
+  values:
+    image:
+      repository: ghcr.io/promethixlabs/cloudflare-tunnel-operator
+      tag: ""
+    namespaceOverride: cloudflare-tunnel-operator-system
+    cloudflare:
+      existingSecretName: cloudflare-tunnel-operator
+    operator:
+      managedClassName: public
+      managedTunnelName: public-tunnel
+      managedIngressClassName: traefik-cloudflare-tunnel
+      ingressTargetUrl: https://traefik-cloudflare-tunnel.traefik.svc.cluster.local
+      allowIngressServiceOverride: false
+      allowCrossNamespaceDirectTargets: false
+      enforceNamespaceHostnamePolicy: true
+      allowedHostnameSuffixesAnnotation: edge.promethix.net/allowed-hostname-suffixes
+      allowedHostnameSuffixes: "apps.example.com,internal.example.com"
+      ownershipConfigMapNamespace: cloudflare-tunnel-operator-system
+      applyChanges: false
+      startupProtectionEnabled: true
+      mutationMode: CreateUpdateOnly
+      maxDeleteCount: 0
+      maxDeletePercentage: 0
+    webhook:
+      enabled: true
+      failurePolicy: Fail
+      certificate:
+        secretName: cloudflare-tunnel-operator-webhook-tls-v1
+        issuerRef:
+          name: platform-ca
+          kind: ClusterIssuer
+          group: cert-manager.io
