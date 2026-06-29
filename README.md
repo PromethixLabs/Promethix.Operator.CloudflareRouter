@@ -108,6 +108,19 @@ Keep `operator.applyChanges=false` for the first run. The operator will plan rec
 
 By default, the chart deploys the image tag matching the chart `appVersion`. Override `image.tag` only when you intentionally want a different image version.
 
+The validating admission webhook is optional. For shared clusters it is a good next step once namespace hostname policy and any operator-wide suffix allowlist are in place. When enabled, supply a working cert-manager issuer name and keep `failurePolicy=Fail` only after confirming certificate issuance and webhook reachability in your cluster.
+
+Example:
+
+```powershell
+helm upgrade --install cloudflare-tunnel-operator `
+  promethix/promethix-cloudflare-tunnel-operator `
+  --namespace cloudflare-tunnel-operator-system `
+  --set webhook.enabled=true `
+  --set webhook.certificate.issuerRef.name=platform-ca `
+  --set webhook.failurePolicy=Fail
+```
+
 To install from a local checkout instead, replace the chart reference with `./charts/promethix-cloudflare-tunnel-operator`.
 
 For GitOps deployments, use the sample manifests in [examples/flux](examples/flux) as a starting point.

@@ -49,7 +49,7 @@ webhook:
   certificate:
     secretName: promethix-cloudflare-tunnel-operator-webhook-tls
     issuerRef:
-      name: ""
+      name: "" # required when webhook.enabled=true
       kind: ClusterIssuer
       group: cert-manager.io
 

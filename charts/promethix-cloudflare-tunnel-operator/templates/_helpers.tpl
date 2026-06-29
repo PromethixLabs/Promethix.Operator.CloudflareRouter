@@ -13,3 +13,11 @@ promethix-cloudflare-tunnel-operator
 {{- include "promethix-cloudflare-tunnel-operator.name" . -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "promethix-cloudflare-tunnel-operator.webhookIssuerName" -}}
+{{- if .Values.webhook.enabled -}}
+{{- required "webhook.certificate.issuerRef.name is required when webhook.enabled=true" .Values.webhook.certificate.issuerRef.name -}}
+{{- else -}}
+{{- .Values.webhook.certificate.issuerRef.name -}}
+{{- end -}}
+{{- end -}}

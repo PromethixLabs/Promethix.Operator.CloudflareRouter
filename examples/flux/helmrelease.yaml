@@ -32,3 +32,11 @@ spec:
       allowedHostnameSuffixes: "apps.example.com,internal.example.com"
       ownershipConfigMapNamespace: cloudflare-tunnel-operator-system
       applyChanges: false
+    webhook:
+      enabled: false
+      failurePolicy: Fail
+      certificate:
+        issuerRef:
+          name: ""
+          kind: ClusterIssuer
+          group: cert-manager.io
