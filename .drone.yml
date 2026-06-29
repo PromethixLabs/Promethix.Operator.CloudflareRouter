@@ -312,7 +312,6 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
     commands:
-      - 'apk add --no-cache jq'
       - 'if [ -z "$${DRONE_TAG}" ]; then echo "DRONE_TAG is empty"; exit 1; fi'
       - 'chartVersion="$${DRONE_TAG#v}"'
       - 'printf "%s" "$${chartVersion}" | grep -Eq "^[0-9]+\.[0-9]+\.[0-9]+-alpha-[0-9a-f]{7}\.[0-9]+$" || { echo "Tag $${DRONE_TAG} is not an alpha prerelease tag; skipping image alignment."; exit 0; }'
@@ -324,7 +323,7 @@ steps:
       - 'harborImageRepo="harbor.internal.promethix.net/promethix/cloudflare-tunnel-operator"; ghcrImageRepo="ghcr.io/promethixlabs/cloudflare-tunnel-operator"; legacyGhcrImageRepo="ghcr.io/gentoorax/cloudflare-tunnel-operator"'
       - 'if skopeo inspect --creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --cert-dir /tmp/harbor-certs "docker://$${harborImageRepo}:$${chartVersion}" >/dev/null 2>&1; then echo "Matching alpha image tag already exists: $${chartVersion}"; exit 0; fi'
       - 'sourcePrefix="$${chartVersion%.*}."'
-      - 'sourceTag="$(skopeo list-tags --creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --cert-dir /tmp/harbor-certs "docker://$${harborImageRepo}" | jq -r --arg prefix "$${sourcePrefix}" ''.Tags[] | select(startswith($prefix))'' | sort -V | tail -n 1)"'
+      - 'sourceTag="$(skopeo list-tags --creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --cert-dir /tmp/harbor-certs "docker://$${harborImageRepo}" | tr -d "\r" | grep -o "\"[^\"]*\"" | tr -d "\"" | grep "^$${sourcePrefix}" | sort -V | tail -n 1)"'
       - 'if [ -z "$${sourceTag}" ] || [ "$${sourceTag}" = "null" ]; then echo "Unable to find a published alpha image matching prefix $${sourcePrefix}"; exit 1; fi'
       - 'echo "Aligning alpha chart tag $${chartVersion} to published image $${sourceTag}"'
       - 'skopeo copy --src-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --dest-creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --src-cert-dir /tmp/harbor-certs --dest-cert-dir /tmp/harbor-certs "docker://$${harborImageRepo}:$${sourceTag}" "docker://$${harborImageRepo}:$${chartVersion}"'
