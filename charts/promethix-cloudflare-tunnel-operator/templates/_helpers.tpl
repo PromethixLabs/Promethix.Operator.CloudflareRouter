@@ -21,3 +21,7 @@ promethix-cloudflare-tunnel-operator
 {{- .Values.webhook.certificate.issuerRef.name -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "promethix-cloudflare-tunnel-operator.webhookCertificateName" -}}
+{{- printf "%s-webhook-%s" (include "promethix-cloudflare-tunnel-operator.name" .) (.Values.webhook.certificate.secretName | sha256sum | trunc 10) -}}
+{{- end -}}

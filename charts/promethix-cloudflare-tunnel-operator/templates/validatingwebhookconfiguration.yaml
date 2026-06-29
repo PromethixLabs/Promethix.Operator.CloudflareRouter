@@ -4,7 +4,7 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}
   annotations:
-    cert-manager.io/inject-ca-from: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}/{{ include "promethix-cloudflare-tunnel-operator.name" . }}-webhook
+    cert-manager.io/inject-ca-from: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}/{{ include "promethix-cloudflare-tunnel-operator.webhookCertificateName" . }}
 webhooks:
   - name: tunnelpublichostnames.edge.promethix.net
     admissionReviewVersions: ["v1"]

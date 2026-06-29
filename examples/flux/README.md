@@ -31,3 +31,4 @@ Do not commit real Cloudflare credentials in plain text. Use SOPS, External Secr
 - destructive Cloudflare mutations blocked by default
 - webhook enabled with cert-manager-backed TLS
 - ingress service override mode set to `ConfiguredTargetOnly`, so only the approved shared ingress target is accepted
+- dedicated webhook TLS secret name, so webhook cert rotation can be managed explicitly

@@ -110,7 +110,7 @@ By default, the chart deploys the image tag matching the chart `appVersion`. Ove
 
 The validating admission webhook is optional. For shared clusters it is a good next step once namespace hostname policy and any operator-wide suffix allowlist are in place. When enabled, supply a working cert-manager issuer name and keep `failurePolicy=Fail` only after confirming certificate issuance and webhook reachability in your cluster.
 The operator keeps its normal HTTP management and health endpoint on port `8080` even when the webhook TLS listener is enabled on `8443`, so the standard liveness and readiness probes remain valid in both modes.
-Use a dedicated webhook certificate secret, and when changing issuers prefer rotating by changing `webhook.certificate.secretName` rather than reusing an old secret issued by a different signer.
+Use a dedicated webhook certificate secret, and when changing issuers prefer rotating by changing `webhook.certificate.secretName` rather than reusing an old secret issued by a different signer. The chart now derives the managed `Certificate` object identity from that secret name so a secret rotation creates a fresh cert-manager certificate resource instead of trying to patch an older one in place.
 
 Example:
 

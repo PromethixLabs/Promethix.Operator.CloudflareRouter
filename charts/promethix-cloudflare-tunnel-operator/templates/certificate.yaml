@@ -2,7 +2,7 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}-webhook
+  name: {{ include "promethix-cloudflare-tunnel-operator.webhookCertificateName" . }}
   namespace: {{ include "promethix-cloudflare-tunnel-operator.namespace" . }}
 spec:
   secretName: {{ .Values.webhook.certificate.secretName }}

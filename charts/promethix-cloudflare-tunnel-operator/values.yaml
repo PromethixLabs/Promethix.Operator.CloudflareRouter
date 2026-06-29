@@ -48,7 +48,7 @@ webhook:
   path: /admission/validate-tunnelpublichostname
   failurePolicy: Fail
   certificate:
-    secretName: promethix-cloudflare-tunnel-operator-webhook-tls # use a dedicated secret for webhook TLS; rotate by changing this name when moving issuers
+    secretName: promethix-cloudflare-tunnel-operator-webhook-tls # use a dedicated secret for webhook TLS; changing this rotates the managed Certificate identity as well
     issuerRef:
       name: "" # required when webhook.enabled=true
       kind: ClusterIssuer # or Issuer for namespace-scoped issuers
