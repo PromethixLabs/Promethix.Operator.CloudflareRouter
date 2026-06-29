@@ -281,6 +281,73 @@ steps:
       - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git push gitea-mirror "refs/tags/$${DRONE_TAG}:refs/tags/$${DRONE_TAG}"'
 
 ---
+# Alpha chart release promotion pipeline.
+# Creates an exact prerelease Git tag from an already-published alpha image,
+# so chart publication is driven by the image that actually passed CI.
+kind: pipeline
+type: docker
+name: promote-alpha-release
+
+clone:
+  depth: 0
+
+trigger:
+  event:
+    - promote
+  target:
+    - alpha-release
+
+steps:
+  - name: resolve-alpha-release-source
+    image: quay.io/skopeo/stable:latest
+    environment:
+      HOME: /tmp
+      HARBOR_USERNAME:
+        from_secret: harbor_robot_username
+      HARBOR_PASSWORD:
+        from_secret: harbor_robot_password
+      HARBOR_CA_CERT:
+        from_secret: harbor_ca_cert
+    commands:
+      - 'mkdir -p .drone; if [ -z "$${HARBOR_USERNAME}" ] || [ -z "$${HARBOR_PASSWORD}" ]; then echo "Harbor secrets are missing (harbor_robot_username / harbor_robot_password)"; exit 1; fi; if [ -z "$${HARBOR_CA_CERT}" ]; then echo "Harbor CA secret is missing (harbor_ca_cert)"; exit 1; fi; mkdir -p /tmp/harbor-certs; printf "%b" "$${HARBOR_CA_CERT}" > /tmp/harbor-certs/harbor-ca.crt; harborImageRepo="harbor.internal.promethix.net/promethix/cloudflare-tunnel-operator"; sourceTag="$${SOURCE_IMAGE_TAG:-alpha-latest}"; configJson="$(skopeo inspect --config --creds "$${HARBOR_USERNAME}:$${HARBOR_PASSWORD}" --cert-dir /tmp/harbor-certs "docker://$${harborImageRepo}:$${sourceTag}")"; buildSemver="$(printf "%s" "$${configJson}" | grep -o "\"org.opencontainers.image.version\":[[:space:]]*\"[^\"]*\"" | head -n 1 | sed "s/^\"org.opencontainers.image.version\":[[:space:]]*\"//; s/\"$//")"; buildNumber="$(printf "%s" "$${configJson}" | grep -o "\"org.promethix.build.number\":[[:space:]]*\"[^\"]*\"" | head -n 1 | sed "s/^\"org.promethix.build.number\":[[:space:]]*\"//; s/\"$//")"; revisionSha="$(printf "%s" "$${configJson}" | grep -o "\"org.opencontainers.image.revision\":[[:space:]]*\"[^\"]*\"" | head -n 1 | sed "s/^\"org.opencontainers.image.revision\":[[:space:]]*\"//; s/\"$//")"; if [ -z "$${buildSemver}" ] || [ -z "$${buildNumber}" ] || [ -z "$${revisionSha}" ]; then echo "Unable to resolve alpha image metadata from $${harborImageRepo}:$${sourceTag}"; echo "$${configJson}"; exit 1; fi; shortCommit="$(printf "%.7s" "$${revisionSha}")"; alphaTag="$${buildSemver}-alpha-$${shortCommit}.$${buildNumber}"; printf "HARBOR_IMAGE_REPO=%s\nSOURCE_TAG=%s\nBUILD_SEMVER=%s\nBUILD_NUMBER=%s\nREVISION_SHA=%s\nSHORT_COMMIT=%s\nALPHA_TAG=%s\n" "$${harborImageRepo}" "$${sourceTag}" "$${buildSemver}" "$${buildNumber}" "$${revisionSha}" "$${shortCommit}" "$${alphaTag}" > .drone/promote-alpha.env'
+
+  - name: announce-alpha-release-promotion
+    image: alpine:3.21
+    depends_on:
+      - resolve-alpha-release-source
+    commands:
+      - '. .drone/promote-alpha.env'
+      - 'echo "Planned alpha chart release:"'
+      - 'echo "  source image tag: $${SOURCE_TAG}"'
+      - 'echo "  alpha chart tag: $${ALPHA_TAG}"'
+      - 'echo "  commit sha: $${REVISION_SHA}"'
+
+  - name: tag-alpha-release
+    image: alpine:3.21
+    depends_on:
+      - announce-alpha-release-promotion
+    environment:
+      HOME: /root
+      GITHUB_RELEASE_TAG_SSH_KEY:
+        from_secret: github_pages_ssh_key
+    commands:
+      - '. .drone/promote-alpha.env'
+      - 'if [ -z "$${GITHUB_RELEASE_TAG_SSH_KEY}" ]; then echo "GitHub release tag SSH key secret is missing (github_pages_ssh_key)"; exit 1; fi'
+      - 'apk add --no-cache git openssh-client'
+      - 'releaseGitTag="v$${ALPHA_TAG}"'
+      - 'mkdir -p /root/.ssh'
+      - 'printf "%s" "$${GITHUB_RELEASE_TAG_SSH_KEY}" | tr -d "\r\n " | base64 -d > /root/.ssh/id_ed25519'
+      - 'chmod 600 /root/.ssh/id_ed25519'
+      - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub SSH private key format"; exit 1; }'
+      - 'git fetch --prune --tags origin'
+      - 'git cat-file -e "$${REVISION_SHA}^{commit}" || { echo "Commit $${REVISION_SHA} is not available in this repository clone"; exit 1; }'
+      - 'if git rev-parse -q --verify "refs/tags/$${releaseGitTag}" >/dev/null; then echo "Alpha release tag $${releaseGitTag} already exists"; exit 0; fi'
+      - 'git config user.name "Drone CI"'
+      - 'git config user.email "drone@users.noreply.github.com"'
+      - 'git tag -a "$${releaseGitTag}" -m "Alpha release $${ALPHA_TAG}" "$${REVISION_SHA}"'
+      - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git push git@github.com:PromethixLabs/Promethix.Operator.CloudflareRouter.git "refs/tags/$${releaseGitTag}"'
+
+---
 # Public Helm chart repository pipeline.
 # Publishes packaged charts to GitHub Pages on SemVer tags only.
 # Stable tags publish normal Helm versions. Prerelease tags publish Helm prereleases,
