@@ -37,7 +37,7 @@ internal sealed class OperatorReadinessHealthCheck(
     {
         if (state.HasCompletedInitialFullInventoryPass)
         {
-            result = default!;
+            result = HealthCheckResult.Healthy(string.Empty);
             return false;
         }
 
@@ -49,7 +49,7 @@ internal sealed class OperatorReadinessHealthCheck(
     {
         if (!webhookState.Enabled || webhookState.ListenerReady)
         {
-            result = default!;
+            result = HealthCheckResult.Healthy(string.Empty);
             return false;
         }
 
@@ -62,7 +62,7 @@ internal sealed class OperatorReadinessHealthCheck(
     {
         if (!options.Value.ApplyChanges || state.IsStartupSafeForMutation)
         {
-            result = default!;
+            result = HealthCheckResult.Healthy(string.Empty);
             return false;
         }
 
