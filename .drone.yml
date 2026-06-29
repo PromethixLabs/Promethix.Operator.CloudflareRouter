@@ -312,6 +312,7 @@ steps:
       GHCR_TOKEN:
         from_secret: ghcr_token
     commands:
+      - 'apk add --no-cache jq'
       - 'if [ -z "$${DRONE_TAG}" ]; then echo "DRONE_TAG is empty"; exit 1; fi'
       - 'chartVersion="$${DRONE_TAG#v}"'
       - 'printf "%s" "$${chartVersion}" | grep -Eq "^[0-9]+\.[0-9]+\.[0-9]+-alpha-[0-9a-f]{7}\.[0-9]+$" || { echo "Tag $${DRONE_TAG} is not an alpha prerelease tag; skipping image alignment."; exit 0; }'
