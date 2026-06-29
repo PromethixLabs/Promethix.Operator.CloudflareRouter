@@ -53,7 +53,7 @@ internal sealed class OperatorReadinessHealthCheck(
             return false;
         }
 
-        result = HealthCheckResult.Degraded(
+        result = HealthCheckResult.Unhealthy(
             webhookState.FailureReason ?? "Admission webhook is enabled but the TLS listener is not ready.");
         return true;
     }

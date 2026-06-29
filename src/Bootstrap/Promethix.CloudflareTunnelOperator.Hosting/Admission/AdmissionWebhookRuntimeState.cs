@@ -6,5 +6,7 @@ internal sealed class AdmissionWebhookRuntimeState
 
     public bool ListenerReady { get; set; }
 
+    public bool CertificateFilesPresent { get; set; }
+
     public string? FailureReason { get; set; }
 }

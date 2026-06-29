@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -38,6 +39,7 @@ if (admissionWebhookOptions.Enabled)
         options.ListenAnyIP(admissionWebhookOptions.ManagementPort);
         if (TryLoadWebhookCertificate(admissionWebhookOptions, out var certificate, out var failureReason))
         {
+            webhookRuntimeState.CertificateFilesPresent = true;
             webhookRuntimeState.ListenerReady = true;
             options.ListenAnyIP(admissionWebhookOptions.Port, listenOptions =>
             {
@@ -46,6 +48,7 @@ if (admissionWebhookOptions.Enabled)
         }
         else
         {
+            webhookRuntimeState.CertificateFilesPresent = HasWebhookCertificateFiles(admissionWebhookOptions);
             webhookRuntimeState.ListenerReady = false;
             webhookRuntimeState.FailureReason = failureReason;
         }
@@ -98,7 +101,7 @@ builder.Services.AddHostedService<OperatorWorker>();
 
 builder.Services
     .AddHealthChecks()
-    .AddCheck("live", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<OperatorLivenessHealthCheck>("live", tags: ["live"])
     .AddCheck<OperatorReadinessHealthCheck>("ready", tags: ["ready"]);
 
 var app = builder.Build();
@@ -129,6 +132,12 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready", StringComparer.Ordinal),
+    ResultStatusCodes =
+    {
+        [HealthStatus.Healthy] = StatusCodes.Status200OK,
+        [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+    },
 });
 
 app.Run();
@@ -158,4 +167,9 @@ static bool TryLoadWebhookCertificate(
         failureReason = $"Admission webhook TLS material could not be loaded: {ex.Message}";
         return false;
     }
+}
+
+static bool HasWebhookCertificateFiles(AdmissionWebhookOptions options)
+{
+    return File.Exists(options.CertificatePath) && File.Exists(options.PrivateKeyPath);
 }
