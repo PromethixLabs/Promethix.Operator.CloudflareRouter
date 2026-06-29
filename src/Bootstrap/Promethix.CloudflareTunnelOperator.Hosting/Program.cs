@@ -28,6 +28,7 @@ if (admissionWebhookOptions.Enabled)
 {
     _ = builder.WebHost.ConfigureKestrel(options =>
     {
+        options.ListenAnyIP(admissionWebhookOptions.ManagementPort);
         options.ListenAnyIP(admissionWebhookOptions.Port, listenOptions =>
         {
             var certificate = X509Certificate2.CreateFromPemFile(

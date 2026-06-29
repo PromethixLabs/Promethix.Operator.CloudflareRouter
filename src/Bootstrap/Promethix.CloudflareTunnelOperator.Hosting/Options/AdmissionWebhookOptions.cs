@@ -4,6 +4,8 @@ internal sealed class AdmissionWebhookOptions
 {
     public const string SectionName = "AdmissionWebhook";
 
+    public int ManagementPort { get; set; } = 8080;
+
     public bool Enabled { get; set; }
 
     public int Port { get; set; } = 8443;

@@ -15,9 +15,19 @@ internal sealed class AdmissionWebhookOptionsValidator : IValidateOptions<Admiss
 
         var failures = new List<string>();
 
+        if (options.ManagementPort <= 0)
+        {
+            failures.Add("AdmissionWebhook:ManagementPort must be greater than zero when the admission webhook is enabled.");
+        }
+
         if (options.Port <= 0)
         {
             failures.Add("AdmissionWebhook:Port must be greater than zero when the admission webhook is enabled.");
+        }
+
+        if (options.ManagementPort == options.Port)
+        {
+            failures.Add("AdmissionWebhook:ManagementPort must be different from AdmissionWebhook:Port when the admission webhook is enabled.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Path) || options.Path[0] != '/')

@@ -63,6 +63,62 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         _ = response.Response.Status!.Message.Should().Contain("does not match managed ingress class");
     }
 
+    [Fact]
+    public async Task ValidateAsyncShouldAllowIngressServiceMatchingConfiguredTargetWhenOverrideDisabled()
+    {
+        var service = CreateService();
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Target = new TunnelTargetSpec
+        {
+            Mode = "ingress",
+            Ingress = new TunnelIngressTargetSpec
+            {
+                ClassName = "traefik-cloudflare-tunnel",
+                Service = new TunnelIngressServiceTargetSpec
+                {
+                    Name = "traefik-cloudflare-tunnel",
+                    Namespace = "edge-system",
+                    Port = 443,
+                    Scheme = "https",
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response!.Allowed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateAsyncShouldRejectIngressServiceOverrideWhenItTargetsDifferentService()
+    {
+        var service = CreateService();
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Target = new TunnelTargetSpec
+        {
+            Mode = "ingress",
+            Ingress = new TunnelIngressTargetSpec
+            {
+                ClassName = "traefik-cloudflare-tunnel",
+                Service = new TunnelIngressServiceTargetSpec
+                {
+                    Name = "other-ingress",
+                    Namespace = "edge-system",
+                    Port = 443,
+                    Scheme = "https",
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response!.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "spec.target.ingress.service is not allowed by this operator. Use the configured ingress target or enable KubernetesOperator:AllowIngressServiceOverride.");
+    }
+
     private static TunnelPublicHostnameAdmissionService CreateService()
     {
         var managedValidator = new ManagedTunnelPublicHostnameValidator(

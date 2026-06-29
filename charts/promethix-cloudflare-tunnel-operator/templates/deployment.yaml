@@ -76,6 +76,8 @@ spec:
               value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
             - name: AdmissionWebhook__Enabled
               value: {{ .Values.webhook.enabled | quote }}
+            - name: AdmissionWebhook__ManagementPort
+              value: {{ .Values.service.port | quote }}
             - name: AdmissionWebhook__Port
               value: {{ .Values.webhook.port | quote }}
             - name: AdmissionWebhook__Path

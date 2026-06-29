@@ -36,6 +36,7 @@ spec:
       enabled: false
       failurePolicy: Fail
       certificate:
+        secretName: cloudflare-tunnel-operator-webhook-tls
         issuerRef:
           name: ""
           kind: ClusterIssuer
