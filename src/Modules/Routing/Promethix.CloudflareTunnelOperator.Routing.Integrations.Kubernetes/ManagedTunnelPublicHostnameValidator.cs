@@ -98,17 +98,7 @@ public sealed class ManagedTunnelPublicHostnameValidator(
 
     private bool IsIngressServiceOverrideAllowed(TunnelIngressServiceTargetSpec service)
     {
-        if (!Enum.TryParse<IngressServiceOverrideMode>(options.Value.IngressServiceOverrideMode, ignoreCase: true, out var mode))
-        {
-            mode = options.Value.AllowIngressServiceOverride
-                ? IngressServiceOverrideMode.Any
-                : IngressServiceOverrideMode.Disabled;
-        }
-
-        if (mode == IngressServiceOverrideMode.Disabled && options.Value.AllowIngressServiceOverride)
-        {
-            mode = IngressServiceOverrideMode.Any;
-        }
+        var mode = ResolveIngressServiceOverrideMode();
 
         return mode switch
         {
@@ -117,6 +107,20 @@ public sealed class ManagedTunnelPublicHostnameValidator(
             IngressServiceOverrideMode.Any => true,
             _ => false,
         };
+    }
+
+    private IngressServiceOverrideMode ResolveIngressServiceOverrideMode()
+    {
+        var configuredMode = options.Value.IngressServiceOverrideMode;
+        var hasLegacyOverrideEnabled = options.Value.AllowIngressServiceOverride;
+
+        if (Enum.TryParse<IngressServiceOverrideMode>(configuredMode, ignoreCase: true, out var mode))
+        {
+            var usesLegacyFallback = mode == IngressServiceOverrideMode.Disabled && hasLegacyOverrideEnabled;
+            return usesLegacyFallback ? IngressServiceOverrideMode.Any : mode;
+        }
+
+        return hasLegacyOverrideEnabled ? IngressServiceOverrideMode.Any : IngressServiceOverrideMode.Disabled;
     }
 
     private static void ValidateDirect(

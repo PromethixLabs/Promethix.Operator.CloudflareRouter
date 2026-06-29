@@ -5,6 +5,9 @@ using Promethix.CloudflareTunnelOperator.Routing.Application;
 
 namespace Promethix.CloudflareTunnelOperator.Hosting.Health;
 
+#pragma warning disable IDE0045 // Readability is preferred here over conditional-expression simplification.
+#pragma warning disable IDE0046 // Readability is preferred here over if-statement simplification.
+
 internal sealed class OperatorReadinessHealthCheck(
     OperatorState state,
     AdmissionWebhookRuntimeState webhookState,
@@ -12,20 +15,66 @@ internal sealed class OperatorReadinessHealthCheck(
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        return !state.HasCompletedInitialFullInventoryPass
-            ? Task.FromResult(HealthCheckResult.Degraded("Initial full inventory reconciliation has not completed yet."))
-            : webhookState.Enabled && !webhookState.ListenerReady
-                ? Task.FromResult(
-                    HealthCheckResult.Degraded(
-                        webhookState.FailureReason ?? "Admission webhook is enabled but the TLS listener is not ready."))
-            : options.Value.ApplyChanges && !state.IsStartupSafeForMutation
-                ? Task.FromResult(
-                    HealthCheckResult.Unhealthy(
-                        state.StartupBlockMessage ?? "Cloudflare writes are blocked because startup safety checks have not passed.",
-                        data: new Dictionary<string, object>
-                        {
-                            ["reason"] = state.StartupBlockReason ?? "Unknown",
-                        }))
-                : Task.FromResult(HealthCheckResult.Healthy("Operator startup safety checks have completed."));
+        if (TryGetInitialInventoryResult(out var result))
+        {
+            return Task.FromResult(result);
+        }
+
+        if (TryGetWebhookResult(out result))
+        {
+            return Task.FromResult(result);
+        }
+
+        if (TryGetMutationSafetyResult(out result))
+        {
+            return Task.FromResult(result);
+        }
+
+        return Task.FromResult(HealthCheckResult.Healthy("Operator startup safety checks have completed."));
+    }
+
+    private bool TryGetInitialInventoryResult(out HealthCheckResult result)
+    {
+        if (state.HasCompletedInitialFullInventoryPass)
+        {
+            result = default!;
+            return false;
+        }
+
+        result = HealthCheckResult.Degraded("Initial full inventory reconciliation has not completed yet.");
+        return true;
+    }
+
+    private bool TryGetWebhookResult(out HealthCheckResult result)
+    {
+        if (!webhookState.Enabled || webhookState.ListenerReady)
+        {
+            result = default!;
+            return false;
+        }
+
+        result = HealthCheckResult.Degraded(
+            webhookState.FailureReason ?? "Admission webhook is enabled but the TLS listener is not ready.");
+        return true;
+    }
+
+    private bool TryGetMutationSafetyResult(out HealthCheckResult result)
+    {
+        if (!options.Value.ApplyChanges || state.IsStartupSafeForMutation)
+        {
+            result = default!;
+            return false;
+        }
+
+        result = HealthCheckResult.Unhealthy(
+            state.StartupBlockMessage ?? "Cloudflare writes are blocked because startup safety checks have not passed.",
+            data: new Dictionary<string, object>
+            {
+                ["reason"] = state.StartupBlockReason ?? "Unknown",
+            });
+        return true;
     }
 }
+
+#pragma warning restore IDE0046
+#pragma warning restore IDE0045
