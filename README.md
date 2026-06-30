@@ -87,6 +87,13 @@ kubectl create secret generic cloudflare-tunnel-operator `
   --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me
 ```
 
+Cloudflare token requirement:
+
+- read-only / dry-run: account-scoped `Cloudflare Tunnel Read`
+- normal apply mode: account-scoped `Cloudflare Tunnel Write`
+
+The operator manages an existing Cloudflare Tunnel configuration. It does not require Zone DNS permissions for its current behavior.
+
 Install the operator:
 
 ```powershell
