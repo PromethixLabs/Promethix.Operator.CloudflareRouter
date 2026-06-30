@@ -1,0 +1,31 @@
+apiVersion: edge.promethix.net/v1alpha1
+kind: TunnelPublicHostname
+metadata:
+  name: api-public
+  namespace: demo
+spec:
+  className: public
+  hostname: api.delta.promethix.net
+  enabled: true
+  tunnelRef:
+    name: delta-public
+  target:
+    mode: ingress
+    ingress:
+      className: traefik-cloudflare-tunnel
+      service:
+        name: traefik-cloudflare-tunnel
+        namespace: edge-system
+        port: 443
+        scheme: https
+  cloudflare:
+    proxied: true
+    security:
+      rateLimit:
+        enabled: true
+        rules:
+          - name: api-v1
+            pathPrefix: /v1/
+            requestsPerPeriod: 60
+            periodSeconds: 60
+            action: managed_challenge

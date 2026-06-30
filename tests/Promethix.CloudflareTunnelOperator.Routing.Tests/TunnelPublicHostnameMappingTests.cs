@@ -348,6 +348,127 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = managedIntent.Route.OriginService.Should().Be(new Uri("https://api.tenant-a.svc.cluster.local:8443"));
     }
 
+    [Fact]
+    public async Task RateLimitSecurityPolicyCanBeMappedFromPathPrefix()
+    {
+        var client = CreateClient();
+        var resource = new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "api-public",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "api.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "direct",
+                    Direct = new TunnelDirectTargetSpec
+                    {
+                        Service = new TunnelIngressServiceTargetSpec
+                        {
+                            Name = "api",
+                            Namespace = "demo",
+                            Port = 8080,
+                            Scheme = "http",
+                        },
+                    },
+                },
+                Cloudflare = new CloudflareRouteSpec
+                {
+                    Security = new CloudflareSecuritySpec
+                    {
+                        RateLimit = new CloudflareRateLimitSpec
+                        {
+                            Enabled = true,
+                            Rules =
+                            [
+                                new CloudflareRateLimitRuleSpec
+                                {
+                                    Name = "api-v1",
+                                    PathPrefix = "/v1/",
+                                    RequestsPerPeriod = 60,
+                                    PeriodSeconds = 60,
+                                    Action = "managed_challenge",
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        };
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = invalidIntent.Should().BeNull();
+        _ = managedIntent.Should().NotBeNull();
+        Assert.NotNull(managedIntent);
+        _ = managedIntent.SecurityPolicy.Should().NotBeNull();
+        _ = managedIntent.SecurityPolicy!.Hostname.Should().Be("api.delta.promethix.net");
+        _ = managedIntent.SecurityPolicy.RateLimitRules.Should().ContainSingle();
+
+        var rule = managedIntent.SecurityPolicy.RateLimitRules.Single();
+        _ = rule.Name.Should().Be("api-v1");
+        _ = rule.Expression.Should().Be("(http.host eq \"api.delta.promethix.net\" and starts_with(http.request.uri.path, \"/v1/\"))");
+        _ = rule.RequestsPerPeriod.Should().Be(60);
+        _ = rule.PeriodSeconds.Should().Be(60);
+        _ = rule.Action.Should().Be("managed_challenge");
+    }
+
+    [Fact]
+    public async Task EnabledRateLimitRequiresRules()
+    {
+        var client = CreateClient();
+        var resource = new TunnelPublicHostnameCustomResource
+        {
+            Metadata = new k8s.Models.V1ObjectMeta
+            {
+                Name = "api-public",
+                NamespaceProperty = "demo",
+            },
+            Spec = new TunnelPublicHostnameSpec
+            {
+                ClassName = "public",
+                Hostname = "api.delta.promethix.net",
+                TunnelRef = new TunnelReferenceSpec { Name = "delta-public" },
+                Target = new TunnelTargetSpec
+                {
+                    Mode = "direct",
+                    Direct = new TunnelDirectTargetSpec
+                    {
+                        Service = new TunnelIngressServiceTargetSpec
+                        {
+                            Name = "api",
+                            Namespace = "demo",
+                            Port = 8080,
+                            Scheme = "http",
+                        },
+                    },
+                },
+                Cloudflare = new CloudflareRouteSpec
+                {
+                    Security = new CloudflareSecuritySpec
+                    {
+                        RateLimit = new CloudflareRateLimitSpec
+                        {
+                            Enabled = true,
+                        },
+                    },
+                },
+            },
+        };
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        _ = invalidIntent!.Reason.Should().Be("spec.cloudflare.security.rateLimit.rules must contain at least one rule when rate limiting is enabled.");
+    }
+
     private sealed class AcceptingIngressTargetValidator : IIngressTargetValidator
     {
         public Task ValidateAsync(

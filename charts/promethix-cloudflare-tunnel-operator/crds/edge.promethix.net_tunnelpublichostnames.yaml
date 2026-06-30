@@ -126,6 +126,35 @@ spec:
                   properties:
                     proxied:
                       type: boolean
+                    security:
+                      type: object
+                      properties:
+                        rateLimit:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            rules:
+                              type: array
+                              items:
+                                type: object
+                                required: ["name", "requestsPerPeriod", "periodSeconds"]
+                                properties:
+                                  name:
+                                    type: string
+                                  pathPrefix:
+                                    type: string
+                                  expression:
+                                    type: string
+                                  requestsPerPeriod:
+                                    type: integer
+                                    minimum: 1
+                                  periodSeconds:
+                                    type: integer
+                                    minimum: 1
+                                  action:
+                                    type: string
+                                    enum: ["block", "challenge", "managed_challenge", "log"]
             status:
               type: object
               properties:
