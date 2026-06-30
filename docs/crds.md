@@ -94,9 +94,9 @@ spec:
 
 ## Security Policy Intent
 
-This branch includes an experimental CRD shape for per-hostname security intent.
+Per-hostname security intent is optional and disabled by default.
 
-The operator currently models and validates this intent only. It does not yet apply Cloudflare WAF or rate-limit rules.
+When `operator.securityPolicies.enabled=true`, the operator reconciles managed Cloudflare rate-limit rules through the Cloudflare Rulesets API. WAF and Access policy reconciliation are not implemented yet.
 
 ```yaml
 spec:
@@ -115,9 +115,12 @@ spec:
 The intended implementation boundary is:
 
 - route reconciliation continues to use the Cloudflare Tunnel configuration API
-- security policy reconciliation should use a separate Cloudflare Rulesets/WAF client
-- security rules must use operator ownership markers
-- unmanaged Cloudflare rules must not be overwritten or deleted
+- rate-limit reconciliation uses a separate Cloudflare Rulesets client
+- security rules use operator ownership markers
+- unmanaged Cloudflare rules are preserved
+- `operator.applyChanges=false` plans security changes without applying them
+
+Security policy reconciliation requires a Cloudflare zone id in addition to the account and tunnel ids.
 
 Full example:
 

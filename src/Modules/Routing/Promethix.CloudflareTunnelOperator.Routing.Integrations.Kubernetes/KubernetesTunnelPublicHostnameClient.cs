@@ -283,7 +283,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
             resource.Metadata.NamespaceProperty ?? string.Empty,
             resource.Metadata.Generation,
             await ToRouteAsync(resource, ownershipTag, cancellationToken).ConfigureAwait(false),
-            ToSecurityPolicy(resource, ownershipTag));
+            ToSecurityPolicy(resource, ownershipTag, routingOptions.Value.SecurityPoliciesEnabled));
     }
 
     private async Task<PublicHostnameRoute> ToRouteAsync(
@@ -363,8 +363,14 @@ public sealed class KubernetesTunnelPublicHostnameClient(
 
     private static HostnameSecurityPolicy? ToSecurityPolicy(
         TunnelPublicHostnameCustomResource resource,
-        string ownershipTag)
+        string ownershipTag,
+        bool securityPoliciesEnabled)
     {
+        if (!securityPoliciesEnabled)
+        {
+            return null;
+        }
+
         var rateLimit = resource.Spec.Cloudflare.Security?.RateLimit;
 
         if (rateLimit is not { Enabled: true })

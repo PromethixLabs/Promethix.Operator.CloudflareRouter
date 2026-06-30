@@ -147,7 +147,8 @@ kubectl create secret generic cloudflare-tunnel-operator `
   --namespace cloudflare-tunnel-operator-system `
   --from-literal=CLOUDFLARE_API_TOKEN=replace-me `
   --from-literal=CLOUDFLARE_ACCOUNT_ID=replace-me `
-  --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me
+  --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me `
+  --from-literal=CLOUDFLARE_ZONE_ID=replace-me
 ```
 
 Annotate each tenant namespace with the hostname suffixes it is allowed to claim:
@@ -216,6 +217,8 @@ For shared clusters, the recommended ingress posture is:
 - if a CR supplies `spec.target.ingress.service`, it is accepted only when it resolves to that same configured shared ingress target
 
 That preserves compatibility with explicit shared-ingress declarations while denying arbitrary ingress service overrides.
+
+Per-hostname Cloudflare rate-limit reconciliation is also disabled by default. To enable it, set `operator.securityPolicies.enabled=true`. This is an advanced feature and requires additional Cloudflare zone/ruleset permissions beyond the basic tunnel-only token used for route reconciliation.
 
 To install from a local checkout instead, replace the chart reference with `./charts/promethix-cloudflare-tunnel-operator`.
 

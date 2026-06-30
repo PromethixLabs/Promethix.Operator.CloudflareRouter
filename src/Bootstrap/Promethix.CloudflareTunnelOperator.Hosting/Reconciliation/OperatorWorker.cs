@@ -6,6 +6,7 @@ namespace Promethix.CloudflareTunnelOperator.Hosting.Reconciliation;
 
 internal sealed class OperatorWorker(
     RouteReconciler reconciler,
+    SecurityPolicyReconciler securityPolicyReconciler,
     IRouteIntentStatusUpdater statusUpdater,
     KubernetesTunnelPublicHostnameClient resourceClient,
     RouteIntentWorkQueue workQueue,
@@ -24,6 +25,18 @@ internal sealed class OperatorWorker(
             LogLevel.Error,
             new EventId(2001, "ReconciliationFailed"),
             "Reconciliation iteration failed.");
+
+    private static readonly Action<ILogger, string, int, int, int, bool, Exception?> LogSecurityPolicyCompleted =
+        LoggerMessage.Define<string, int, int, int, bool>(
+            LogLevel.Information,
+            new EventId(2003, "SecurityPolicyReconciliationCompleted"),
+            "Security policy reconciliation completed for {Hostname}. Create {CreateCount}, update {UpdateCount}, delete {DeleteCount}, applied {ChangesApplied}.");
+
+    private static readonly Action<ILogger, string, Exception> LogSecurityPolicyFailed =
+        LoggerMessage.Define<string>(
+            LogLevel.Error,
+            new EventId(2004, "SecurityPolicyReconciliationFailed"),
+            "Security policy reconciliation failed for {Hostname}.");
 
     private static readonly Action<ILogger, string, Exception?> LogReconciliationTriggered =
         LoggerMessage.Define<string>(
@@ -95,6 +108,7 @@ internal sealed class OperatorWorker(
         await EnsureManagedFinalizersAsync(result, cancellationToken).ConfigureAwait(false);
         await statusUpdater.UpdateAsync(result, failure: null, cancellationToken).ConfigureAwait(false);
         await ProcessPendingCleanupAsync(cancellationToken).ConfigureAwait(false);
+        await ReconcileSecurityPoliciesAsync(result.Intent.ManagedRoutes, cancellationToken).ConfigureAwait(false);
 
         LogReconciliationCompleted(
             logger,
@@ -146,6 +160,7 @@ internal sealed class OperatorWorker(
         var result = await reconciler.ReconcileManagedRouteAsync(options.Value, managedIntent, cancellationToken).ConfigureAwait(false);
         state.MarkReconciliationCompleted(result.CompletedAt);
         await statusUpdater.UpdateAsync(result, failure: null, cancellationToken).ConfigureAwait(false);
+        await ReconcileSecurityPolicyAsync(managedIntent, cancellationToken).ConfigureAwait(false);
 
         LogReconciliationCompleted(
             logger,
@@ -198,6 +213,18 @@ internal sealed class OperatorWorker(
 
         if (!string.IsNullOrWhiteSpace(cleanupHostname))
         {
+            if (options.Value.SecurityPoliciesEnabled)
+            {
+                var securityCleanupResult = await securityPolicyReconciler
+                    .CleanupAsync(options.Value, cleanupHostname, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (securityCleanupResult.Plan.HasChanges && !securityCleanupResult.ChangesApplied)
+                {
+                    return;
+                }
+            }
+
             var cleanupResult = await reconciler.CleanupRouteAsync(options.Value, cleanupHostname, cancellationToken).ConfigureAwait(false);
             cleanupDisposition = RouteCleanupDispositionEvaluator.Evaluate(options.Value, cleanupResult);
 
@@ -227,5 +254,54 @@ internal sealed class OperatorWorker(
             cleanupHostname,
             cleanupDisposition?.Message ?? "Managed route cleanup completed.",
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ReconcileSecurityPoliciesAsync(
+        IEnumerable<ManagedRouteIntent> intents,
+        CancellationToken cancellationToken)
+    {
+        foreach (var intent in intents)
+        {
+            await ReconcileSecurityPolicyAsync(intent, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task ReconcileSecurityPolicyAsync(ManagedRouteIntent intent, CancellationToken cancellationToken)
+    {
+        if (intent.SecurityPolicy is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await securityPolicyReconciler
+                .ReconcileAsync(options.Value, intent, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result is null)
+            {
+                return;
+            }
+
+            LogSecurityPolicyCompleted(
+                logger,
+                result.Policy.Hostname,
+                result.Plan.ToCreate.Count,
+                result.Plan.ToUpdate.Count,
+                result.Plan.ToDelete.Count,
+                result.ChangesApplied,
+                null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            LogSecurityPolicyFailed(logger, intent.Route.Hostname, ex);
+        }
     }
 }

@@ -34,6 +34,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.cloudflare.existingSecretName }}
                   key: {{ .Values.cloudflare.tunnelIdKey }}
+            {{- if .Values.operator.securityPolicies.enabled }}
+            - name: CloudflareTunnel__ZoneId
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.zoneIdKey }}
+            {{- end }}
             - name: KubernetesOperator__ManagedClassName
               value: {{ .Values.operator.managedClassName | quote }}
             - name: KubernetesOperator__ManagedTunnelName
@@ -74,6 +81,8 @@ spec:
               value: {{ .Values.operator.maxDeleteCount | quote }}
             - name: RoutingOperator__MaxDeletePercentage
               value: {{ .Values.operator.maxDeletePercentage | quote }}
+            - name: RoutingOperator__SecurityPoliciesEnabled
+              value: {{ .Values.operator.securityPolicies.enabled | quote }}
             - name: RoutingOperator__ReconciliationIntervalSeconds
               value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
             - name: AdmissionWebhook__Enabled

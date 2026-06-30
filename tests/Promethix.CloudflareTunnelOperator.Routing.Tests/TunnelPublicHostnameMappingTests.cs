@@ -351,7 +351,7 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task RateLimitSecurityPolicyCanBeMappedFromPathPrefix()
     {
-        var client = CreateClient();
+        var client = CreateClient(securityPoliciesEnabled: true);
         var resource = new TunnelPublicHostnameCustomResource
         {
             Metadata = new k8s.Models.V1ObjectMeta
@@ -422,7 +422,7 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task EnabledRateLimitRequiresRules()
     {
-        var client = CreateClient();
+        var client = CreateClient(securityPoliciesEnabled: true);
         var resource = new TunnelPublicHostnameCustomResource
         {
             Metadata = new k8s.Models.V1ObjectMeta
@@ -577,6 +577,7 @@ public sealed class TunnelPublicHostnameMappingTests
             Options.Create(new RoutingOperatorOptions
             {
                 OwnershipTag = "promethix-cloudflare-tunnel-operator",
+                SecurityPoliciesEnabled = securityPoliciesEnabled,
             }),
             new ManagedTunnelPublicHostnameValidator(
                 Options.Create(kubernetesOptions),
