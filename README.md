@@ -56,9 +56,67 @@ Example manifests are in [examples](examples):
 - [tenant-rbac.yaml](examples/tenant-rbac.yaml)
 - [flux](examples/flux)
 
-The Flux example is intentionally generic and uses placeholder secrets. Replace values for your cluster, tunnel, and ingress controller.
+The examples are intentionally generic and use placeholder values. Replace hostnames, tunnel names, secrets, and ingress details for your cluster.
+
+## Quick Start
+
+This is the minimum setup for a first deployment.
+
+Before you start:
+
+1. Create and manage a Cloudflare Tunnel separately.
+2. Know the tunnel name you want this operator to manage.
+3. Have an ingress controller, or plan to use direct service targets.
+
+Add the Helm repository:
+
+```powershell
+helm repo add promethix https://promethixlabs.github.io/charts
+helm repo update
+```
+
+Create a namespace and Cloudflare Secret:
+
+```powershell
+kubectl create namespace cloudflare-tunnel-operator-system
+
+kubectl create secret generic cloudflare-tunnel-operator `
+  --namespace cloudflare-tunnel-operator-system `
+  --from-literal=CLOUDFLARE_API_TOKEN=replace-me `
+  --from-literal=CLOUDFLARE_ACCOUNT_ID=replace-me `
+  --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me
+```
+
+Install the operator:
+
+```powershell
+helm upgrade --install cloudflare-tunnel-operator `
+  promethix/promethix-cloudflare-tunnel-operator `
+  --namespace cloudflare-tunnel-operator-system `
+  --create-namespace `
+  --set image.repository=ghcr.io/promethixlabs/cloudflare-tunnel-operator `
+  --set cloudflare.existingSecretName=cloudflare-tunnel-operator `
+  --set operator.managedTunnelName=public-tunnel `
+  --set operator.managedIngressClassName=traefik-cloudflare-tunnel `
+  --set operator.ingressTargetUrl=https://traefik-cloudflare-tunnel.traefik.svc.cluster.local `
+  --set operator.applyChanges=false
+```
+
+Create a test app:
+
+- ingress-backed example: [examples/ingress-backed-app.yaml](examples/ingress-backed-app.yaml)
+- direct-service example: [examples/direct-origin-app.yaml](examples/direct-origin-app.yaml)
+
+For a first run, keep `operator.applyChanges=false`. That lets you confirm the CRs are valid and see planned behavior without writing Cloudflare config. After that, set `operator.applyChanges=true`.
+
+If you use Flux instead of manual Helm, start with:
+
+- [examples/flux/README.md](examples/flux/README.md)
+- [examples/flux/helmrelease.yaml](examples/flux/helmrelease.yaml)
 
 ## Manual Helm Deployment
+
+If you want more control than the quick start, use the full Helm configuration below.
 
 Add the public Helm repository:
 
@@ -107,6 +165,24 @@ helm upgrade --install cloudflare-tunnel-operator `
 Keep `operator.applyChanges=false` for the first run. The operator will plan reconciliation and update CRD status without writing Cloudflare tunnel config. Set it to `true` only after validating logs, status, and ownership behavior.
 
 By default, the chart deploys the image tag matching the chart `appVersion`. Override `image.tag` only when you intentionally want a different image version.
+
+## Optional Hardening
+
+The operator can be deployed with a very small baseline, then tightened later.
+
+Useful next steps for shared clusters:
+
+- namespace hostname ownership policy
+- operator-wide hostname suffix allowlist
+- namespace-scoped RBAC for tenant users
+- validating admission webhook
+- restrictive ingress override handling
+- cross-namespace direct targets disabled
+
+For a stricter shared-cluster example, see:
+
+- [examples/flux/helmrelease.shared-cluster.yaml](examples/flux/helmrelease.shared-cluster.yaml)
+- [examples/tenant-rbac.yaml](examples/tenant-rbac.yaml)
 
 The validating admission webhook is optional. For shared clusters it is a good next step once namespace hostname policy and any operator-wide suffix allowlist are in place. When enabled, supply a working cert-manager issuer name and keep `failurePolicy=Fail` only after confirming certificate issuance and webhook reachability in your cluster.
 The operator keeps its normal HTTP management and health endpoint on port `8080` even when the webhook TLS listener is enabled on `8443`, so the standard liveness and readiness probes remain valid in both modes.
