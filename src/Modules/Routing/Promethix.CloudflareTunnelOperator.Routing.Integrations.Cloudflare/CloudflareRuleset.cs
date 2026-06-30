@@ -33,12 +33,16 @@ internal sealed class CloudflareRulesetRule
 
 internal sealed class CloudflareRateLimit
 {
+    [JsonPropertyName("characteristics")]
     public IReadOnlyCollection<string> Characteristics { get; set; } = ["cf.colo.id", "ip.src"];
 
+    [JsonPropertyName("period")]
     public int Period { get; set; }
 
+    [JsonPropertyName("requests_per_period")]
     public int RequestsPerPeriod { get; set; }
 
+    [JsonPropertyName("mitigation_timeout")]
     public int MitigationTimeout { get; set; }
 }
 

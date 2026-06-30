@@ -51,7 +51,8 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         _ = rule.GetProperty("expression").GetString().Should().Be("(http.host eq \"api.example.com\" and starts_with(http.request.uri.path, \"/v1/\"))");
         _ = rule.GetProperty("description").GetString().Should().Be("promethix-cloudflare-tunnel-operator:owner:api.example.com:api-v1");
         _ = rule.GetProperty("ratelimit").GetProperty("period").GetInt32().Should().Be(60);
-        _ = rule.GetProperty("ratelimit").GetProperty("requestsPerPeriod").GetInt32().Should().Be(60);
+        _ = rule.GetProperty("ratelimit").GetProperty("requests_per_period").GetInt32().Should().Be(60);
+        _ = rule.GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
     }
 
     [Fact]
@@ -74,8 +75,8 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
                     "enabled": true,
                     "ratelimit": {
                       "period": 60,
-                      "requestsPerPeriod": 30,
-                      "mitigationTimeout": 60,
+                      "requests_per_period": 30,
+                      "mitigation_timeout": 60,
                       "characteristics": ["cf.colo.id", "ip.src"]
                     }
                   }
@@ -97,7 +98,7 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
 
-        _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("requestsPerPeriod").GetInt32().Should().Be(60);
+        _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("requests_per_period").GetInt32().Should().Be(60);
     }
 
     private static HttpClient CreateHttpClient(HttpMessageHandler handler)
