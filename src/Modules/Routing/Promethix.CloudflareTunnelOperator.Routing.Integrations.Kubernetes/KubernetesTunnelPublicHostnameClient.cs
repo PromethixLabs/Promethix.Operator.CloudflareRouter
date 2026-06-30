@@ -252,6 +252,9 @@ public sealed class KubernetesTunnelPublicHostnameClient(
                 await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken).ConfigureAwait(false);
             }
         }
+
+        throw new InvalidOperationException(
+            $"Unable to {(addFinalizer ? "add" : "remove")} finalizer '{options.Value.ManagedFinalizerName}' for resource '{key}' after {MetadataPatchRetryCount} attempts.");
     }
 
     private bool IsDesiredManagedResource(TunnelPublicHostnameCustomResource resource)

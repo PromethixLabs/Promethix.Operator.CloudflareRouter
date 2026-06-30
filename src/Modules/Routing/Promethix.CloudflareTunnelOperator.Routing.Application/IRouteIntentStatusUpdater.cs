@@ -8,12 +8,28 @@ public interface IRouteIntentStatusUpdater
 
     Task UpdateInvalidAsync(InvalidRouteIntent invalidIntent, CancellationToken cancellationToken);
 
-    Task UpdateCleanupAsync(
+    Task UpdateCleanupPendingAsync(
         string resourceNamespace,
         string name,
         long? observedGeneration,
         string? appliedHostname,
-        bool completed,
+        string message,
+        CancellationToken cancellationToken);
+
+    Task UpdateCleanupBlockedAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string? appliedHostname,
+        string reason,
+        string message,
+        CancellationToken cancellationToken);
+
+    Task UpdateCleanupCompletedAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string? appliedHostname,
         string message,
         CancellationToken cancellationToken);
 }

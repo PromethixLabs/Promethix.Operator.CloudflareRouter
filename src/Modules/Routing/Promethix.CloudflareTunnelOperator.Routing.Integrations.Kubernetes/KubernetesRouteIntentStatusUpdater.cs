@@ -151,12 +151,11 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             cancellationToken);
     }
 
-    public Task UpdateCleanupAsync(
+    public Task UpdateCleanupPendingAsync(
         string resourceNamespace,
         string name,
         long? observedGeneration,
         string? appliedHostname,
-        bool completed,
         string message,
         CancellationToken cancellationToken)
     {
@@ -169,14 +168,71 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 options.Value.ManagedTunnelName,
                 appliedHostname,
                 "False",
-                completed ? "Deleted" : "CleanupPending",
-                completed ? "Managed route cleanup completed." : message,
+                "CleanupPending",
+                message,
                 "Unknown",
                 "Deleting",
                 "Resource is being deleted or removed from managed scope.",
-                completed ? "False" : "True",
-                completed ? "CleanedUp" : "CleanupPending",
-                completed ? "Managed route cleanup completed." : message),
+                "True",
+                "CleanupPending",
+                message),
+            cancellationToken);
+    }
+
+    public Task UpdateCleanupBlockedAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string? appliedHostname,
+        string reason,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        return UpdateStatusAsync(
+            resourceNamespace,
+            name,
+            CreateStatus(
+                observedGeneration,
+                routingOptions.Value.OwnershipTag,
+                options.Value.ManagedTunnelName,
+                appliedHostname,
+                "False",
+                reason,
+                message,
+                "Unknown",
+                "Deleting",
+                "Resource is being deleted or removed from managed scope.",
+                "True",
+                reason,
+                message),
+            cancellationToken);
+    }
+
+    public Task UpdateCleanupCompletedAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string? appliedHostname,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        return UpdateStatusAsync(
+            resourceNamespace,
+            name,
+            CreateStatus(
+                observedGeneration,
+                routingOptions.Value.OwnershipTag,
+                options.Value.ManagedTunnelName,
+                appliedHostname,
+                "False",
+                "Deleted",
+                message,
+                "Unknown",
+                "Deleting",
+                "Resource is being deleted or removed from managed scope.",
+                "False",
+                "CleanedUp",
+                message),
             cancellationToken);
     }
 
@@ -230,6 +286,10 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.Conflict && attempt < StatusPatchRetryCount)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return;
             }
         }
     }

@@ -186,37 +186,46 @@ internal sealed class OperatorWorker(
             resource.Metadata.Name ?? string.Empty);
         var cleanupHostname = KubernetesTunnelPublicHostnameClient.GetCleanupHostname(resource);
 
-        await statusUpdater.UpdateCleanupAsync(
+        await statusUpdater.UpdateCleanupPendingAsync(
             key.Namespace,
             key.Name,
             resource.Metadata.Generation,
             cleanupHostname,
-            completed: false,
             message: "Cleaning up managed route before removing finalizer.",
             cancellationToken).ConfigureAwait(false);
+
+        RouteCleanupDisposition? cleanupDisposition = null;
 
         if (!string.IsNullOrWhiteSpace(cleanupHostname))
         {
             var cleanupResult = await reconciler.CleanupRouteAsync(options.Value, cleanupHostname, cancellationToken).ConfigureAwait(false);
+            cleanupDisposition = RouteCleanupDispositionEvaluator.Evaluate(options.Value, cleanupResult);
 
-            if (cleanupResult.Plan.HasChanges && !cleanupResult.ChangesApplied)
+            if (cleanupDisposition.IsBlocked)
             {
+                await statusUpdater.UpdateCleanupBlockedAsync(
+                    key.Namespace,
+                    key.Name,
+                    resource.Metadata.Generation,
+                    cleanupHostname,
+                    cleanupDisposition.Reason,
+                    cleanupDisposition.Message,
+                    cancellationToken).ConfigureAwait(false);
                 return;
             }
         }
-
-        await statusUpdater.UpdateCleanupAsync(
-            key.Namespace,
-            key.Name,
-            resource.Metadata.Generation,
-            cleanupHostname,
-            completed: true,
-            message: "Managed route cleanup completed.",
-            cancellationToken).ConfigureAwait(false);
 
         if (resourceClient.HasManagedFinalizer(resource))
         {
             await resourceClient.RemoveFinalizerAsync(key, cancellationToken).ConfigureAwait(false);
         }
+
+        await statusUpdater.UpdateCleanupCompletedAsync(
+            key.Namespace,
+            key.Name,
+            resource.Metadata.Generation,
+            cleanupHostname,
+            cleanupDisposition?.Message ?? "Managed route cleanup completed.",
+            cancellationToken).ConfigureAwait(false);
     }
 }
