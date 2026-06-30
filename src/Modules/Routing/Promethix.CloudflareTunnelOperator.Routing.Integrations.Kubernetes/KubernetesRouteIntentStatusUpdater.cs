@@ -194,6 +194,22 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             cancellationToken);
     }
 
+    public Task UpdateSecurityPolicyConditionAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string status,
+        string reason,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        return UpdateConditionAsync(
+            resourceNamespace,
+            name,
+            CreateCondition("SecurityPolicyReady", status, reason, message, observedGeneration),
+            cancellationToken);
+    }
+
     public Task UpdateCleanupPendingAsync(
         string resourceNamespace,
         string name,

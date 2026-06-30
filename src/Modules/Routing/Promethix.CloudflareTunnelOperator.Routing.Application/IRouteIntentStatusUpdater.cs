@@ -14,6 +14,15 @@ public interface IRouteIntentStatusUpdater
         Exception? failure,
         CancellationToken cancellationToken);
 
+    Task UpdateSecurityPolicyConditionAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string status,
+        string reason,
+        string message,
+        CancellationToken cancellationToken);
+
     Task UpdateCleanupPendingAsync(
         string resourceNamespace,
         string name,

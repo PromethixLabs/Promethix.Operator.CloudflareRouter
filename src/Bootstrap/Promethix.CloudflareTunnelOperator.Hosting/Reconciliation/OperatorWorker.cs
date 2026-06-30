@@ -209,24 +209,10 @@ internal sealed class OperatorWorker(
             message: "Cleaning up managed route before removing finalizer.",
             cancellationToken).ConfigureAwait(false);
 
-        RouteCleanupDisposition? cleanupDisposition = null;
-
         if (!string.IsNullOrWhiteSpace(cleanupHostname))
         {
-            if (options.Value.SecurityPoliciesEnabled)
-            {
-                var securityCleanupResult = await securityPolicyReconciler
-                    .CleanupAsync(options.Value, cleanupHostname, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (securityCleanupResult.Plan.HasChanges && !securityCleanupResult.ChangesApplied)
-                {
-                    return;
-                }
-            }
-
             var cleanupResult = await reconciler.CleanupRouteAsync(options.Value, cleanupHostname, cancellationToken).ConfigureAwait(false);
-            cleanupDisposition = RouteCleanupDispositionEvaluator.Evaluate(options.Value, cleanupResult);
+            var cleanupDisposition = RouteCleanupDispositionEvaluator.Evaluate(options.Value, cleanupResult);
 
             if (cleanupDisposition.IsBlocked)
             {
@@ -240,6 +226,47 @@ internal sealed class OperatorWorker(
                     cancellationToken).ConfigureAwait(false);
                 return;
             }
+
+            var securityCleanupDisposition = await EvaluateSecurityPolicyCleanupAsync(resource, cleanupHostname, cancellationToken).ConfigureAwait(false);
+
+            if (securityCleanupDisposition.ShouldUpdateSecurityCondition)
+            {
+                await statusUpdater.UpdateSecurityPolicyConditionAsync(
+                    key.Namespace,
+                    key.Name,
+                    resource.Metadata.Generation,
+                    securityCleanupDisposition.SecurityConditionStatus,
+                    securityCleanupDisposition.SecurityConditionReason,
+                    securityCleanupDisposition.SecurityConditionMessage,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            if (securityCleanupDisposition.ShouldBlockFinalizer)
+            {
+                await statusUpdater.UpdateCleanupBlockedAsync(
+                    key.Namespace,
+                    key.Name,
+                    resource.Metadata.Generation,
+                    cleanupHostname,
+                    securityCleanupDisposition.CleanupReason,
+                    securityCleanupDisposition.CleanupMessage,
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (resourceClient.HasManagedFinalizer(resource))
+            {
+                await resourceClient.RemoveFinalizerAsync(key, cancellationToken).ConfigureAwait(false);
+            }
+
+            await statusUpdater.UpdateCleanupCompletedAsync(
+                key.Namespace,
+                key.Name,
+                resource.Metadata.Generation,
+                cleanupHostname,
+                securityCleanupDisposition.CleanupMessage,
+                cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         if (resourceClient.HasManagedFinalizer(resource))
@@ -252,8 +279,38 @@ internal sealed class OperatorWorker(
             key.Name,
             resource.Metadata.Generation,
             cleanupHostname,
-            cleanupDisposition?.Message ?? "Managed route cleanup completed.",
+            "Managed route cleanup completed.",
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<SecurityPolicyCleanupDisposition> EvaluateSecurityPolicyCleanupAsync(
+        TunnelPublicHostnameCustomResource resource,
+        string cleanupHostname,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Value.SecurityPoliciesEnabled)
+        {
+            return SecurityPolicyCleanupDispositionEvaluator.Evaluate(resource, cleanupResult: null, failure: null);
+        }
+
+        try
+        {
+            var cleanupResult = await securityPolicyReconciler
+                .CleanupAsync(options.Value, cleanupHostname, cancellationToken)
+                .ConfigureAwait(false);
+
+            return SecurityPolicyCleanupDispositionEvaluator.Evaluate(resource, cleanupResult, failure: null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            return SecurityPolicyCleanupDispositionEvaluator.Evaluate(resource, cleanupResult: null, ex);
+        }
     }
 
     private async Task ReconcileSecurityPoliciesAsync(
