@@ -151,7 +151,6 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             cancellationToken);
     }
 
-    public Task UpdateCleanupPendingAsync(
     public Task UpdateSecurityPolicyAsync(
         ManagedRouteIntent intent,
         SecurityPolicyReconciliationResult? result,

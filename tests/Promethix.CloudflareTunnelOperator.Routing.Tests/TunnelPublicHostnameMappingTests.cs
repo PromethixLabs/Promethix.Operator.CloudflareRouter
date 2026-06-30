@@ -557,6 +557,7 @@ public sealed class TunnelPublicHostnameMappingTests
 
     private static KubernetesTunnelPublicHostnameClient CreateClient(
         Action<KubernetesOperatorOptions>? configure = null,
+        bool securityPoliciesEnabled = false,
         IHostnameOwnershipValidator? hostnameOwnershipValidator = null)
     {
         var kubernetesOptions = new KubernetesOperatorOptions
