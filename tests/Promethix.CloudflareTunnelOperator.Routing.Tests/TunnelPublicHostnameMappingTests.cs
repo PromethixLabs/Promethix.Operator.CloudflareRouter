@@ -408,10 +408,12 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = managedIntent.Should().NotBeNull();
         Assert.NotNull(managedIntent);
         _ = managedIntent.SecurityPolicy.Should().NotBeNull();
-        _ = managedIntent.SecurityPolicy!.Hostname.Should().Be("api.delta.promethix.net");
-        _ = managedIntent.SecurityPolicy.RateLimitRules.Should().ContainSingle();
+        var securityPolicy = managedIntent.SecurityPolicy;
+        Assert.NotNull(securityPolicy);
+        _ = securityPolicy.Hostname.Should().Be("api.delta.promethix.net");
+        _ = securityPolicy.RateLimitRules.Should().ContainSingle();
 
-        var rule = managedIntent.SecurityPolicy.RateLimitRules.Single();
+        var rule = securityPolicy.RateLimitRules.Single();
         _ = rule.Name.Should().Be("api-v1");
         _ = rule.Expression.Should().Be("(http.host eq \"api.delta.promethix.net\" and starts_with(http.request.uri.path, \"/v1/\"))");
         _ = rule.RequestsPerPeriod.Should().Be(60);
@@ -466,7 +468,8 @@ public sealed class TunnelPublicHostnameMappingTests
 
         _ = managedIntent.Should().BeNull();
         _ = invalidIntent.Should().NotBeNull();
-        _ = invalidIntent!.Reason.Should().Be("spec.cloudflare.security.rateLimit.rules must contain at least one rule when rate limiting is enabled.");
+        Assert.NotNull(invalidIntent);
+        _ = invalidIntent.Reason.Should().Be("spec.cloudflare.security.rateLimit.rules must contain at least one rule when rate limiting is enabled.");
     }
 
     private sealed class AcceptingIngressTargetValidator : IIngressTargetValidator
