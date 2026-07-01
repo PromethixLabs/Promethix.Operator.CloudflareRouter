@@ -43,7 +43,7 @@ public sealed class CloudflareTunnelRouteClientTests
 
         _ = routes.Should().ContainSingle(route => route.Hostname == "active.example.com");
         _ = ownershipStore.SavedOwnership.Should().NotBeNull();
-        _ = ownershipStore.SavedOwnership!.Keys.Should().BeEquivalentTo(["active.example.com"]);
+        _ = ownershipStore.SavedOwnership.Keys.Should().BeEquivalentTo(["active.example.com"]);
     }
 
     private static HttpClient CreateHttpClient(HttpMessageHandler handler)
