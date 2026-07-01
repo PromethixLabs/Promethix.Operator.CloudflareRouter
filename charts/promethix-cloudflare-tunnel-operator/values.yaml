@@ -19,7 +19,7 @@ cloudflare:
   apiTokenKey: CLOUDFLARE_API_TOKEN
   accountIdKey: CLOUDFLARE_ACCOUNT_ID
   tunnelIdKey: CLOUDFLARE_TUNNEL_ID
-  zoneIdKey: CLOUDFLARE_ZONE_ID
+  zoneIdKey: CLOUDFLARE_ZONE_ID # legacy single-zone fallback; ignored when zoneMappings are configured
   zoneMappings: []
 
 operator:

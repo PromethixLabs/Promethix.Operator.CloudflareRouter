@@ -35,14 +35,9 @@ spec:
                   name: {{ .Values.cloudflare.existingSecretName }}
                   key: {{ .Values.cloudflare.tunnelIdKey }}
             {{- if .Values.operator.securityPolicies.enabled }}
-            {{- if .Values.cloudflare.zoneIdKey }}
-            - name: CloudflareTunnel__ZoneId
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.cloudflare.existingSecretName }}
-                  key: {{ .Values.cloudflare.zoneIdKey }}
-            {{- end }}
-            {{- range $index, $mapping := .Values.cloudflare.zoneMappings }}
+            {{- $zoneMappings := .Values.cloudflare.zoneMappings | default (list) }}
+            {{- if gt (len $zoneMappings) 0 }}
+            {{- range $index, $mapping := $zoneMappings }}
             - name: CloudflareTunnel__ZoneMappings__{{ $index }}__HostnameSuffix
               value: {{ $mapping.hostnameSuffix | quote }}
             - name: CloudflareTunnel__ZoneMappings__{{ $index }}__ZoneId
@@ -50,6 +45,13 @@ spec:
                 secretKeyRef:
                   name: {{ $.Values.cloudflare.existingSecretName }}
                   key: {{ $mapping.zoneIdKey | quote }}
+            {{- end }}
+            {{- else if .Values.cloudflare.zoneIdKey }}
+            - name: CloudflareTunnel__ZoneId
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.zoneIdKey }}
             {{- end }}
             {{- end }}
             - name: KubernetesOperator__ManagedClassName
