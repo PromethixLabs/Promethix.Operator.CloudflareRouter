@@ -352,7 +352,9 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task RateLimitSecurityPolicyCanBeMappedFromPathPrefix()
     {
-        var client = CreateClient(securityPoliciesEnabled: true);
+        var client = CreateClient(
+            securityPoliciesEnabled: true,
+            configureCloudflare: options => options.ZoneId = "zone-id");
         var resource = new TunnelPublicHostnameCustomResource
         {
             Metadata = new k8s.Models.V1ObjectMeta
@@ -425,7 +427,9 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task EnabledRateLimitRequiresRules()
     {
-        var client = CreateClient(securityPoliciesEnabled: true);
+        var client = CreateClient(
+            securityPoliciesEnabled: true,
+            configureCloudflare: options => options.ZoneId = "zone-id");
         var resource = new TunnelPublicHostnameCustomResource
         {
             Metadata = new k8s.Models.V1ObjectMeta
@@ -520,7 +524,9 @@ public sealed class TunnelPublicHostnameMappingTests
     [Fact]
     public async Task EnterpriseOnlyLogRateLimitActionIsRejectedByDefault()
     {
-        var client = CreateClient(securityPoliciesEnabled: true);
+        var client = CreateClient(
+            securityPoliciesEnabled: true,
+            configureCloudflare: options => options.ZoneId = "zone-id");
         var resource = CreateRateLimitedResource("log");
 
         var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
@@ -537,7 +543,8 @@ public sealed class TunnelPublicHostnameMappingTests
     {
         var client = CreateClient(
             securityPoliciesEnabled: true,
-            configureRouting: options => options.AllowEnterpriseOnlyRateLimitActions = true);
+            configureRouting: options => options.AllowEnterpriseOnlyRateLimitActions = true,
+            configureCloudflare: options => options.ZoneId = "zone-id");
         var resource = CreateRateLimitedResource("log");
 
         var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
