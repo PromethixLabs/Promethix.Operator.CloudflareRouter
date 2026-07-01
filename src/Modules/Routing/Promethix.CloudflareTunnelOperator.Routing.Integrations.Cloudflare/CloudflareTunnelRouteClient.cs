@@ -180,8 +180,10 @@ public sealed class CloudflareTunnelRouteClient(
                 continue;
             }
 
-            _ = prunedOwnership.Remove(hostname);
-            removedCount++;
+            if (prunedOwnership.Remove(hostname))
+            {
+                removedCount++;
+            }
         }
 
         if (removedCount == 0)
