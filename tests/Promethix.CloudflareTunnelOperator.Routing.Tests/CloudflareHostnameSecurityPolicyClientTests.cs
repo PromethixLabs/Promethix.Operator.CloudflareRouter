@@ -46,6 +46,8 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         using var document = JsonDocument.Parse(body);
         var rule = document.RootElement.GetProperty("rules")[0];
 
+        _ = document.RootElement.TryGetProperty("id", out _).Should().BeFalse();
+        _ = rule.TryGetProperty("id", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("phase").GetString().Should().Be("http_ratelimit");
         _ = rule.GetProperty("action").GetString().Should().Be("managed_challenge");
         _ = rule.GetProperty("expression").GetString().Should().Be("(http.host eq \"api.example.com\" and starts_with(http.request.uri.path, \"/v1/\"))");
@@ -128,6 +130,8 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
 
+        _ = document.RootElement.TryGetProperty("id", out _).Should().BeFalse();
+        _ = document.RootElement.GetProperty("rules")[0].TryGetProperty("id", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
     }
 

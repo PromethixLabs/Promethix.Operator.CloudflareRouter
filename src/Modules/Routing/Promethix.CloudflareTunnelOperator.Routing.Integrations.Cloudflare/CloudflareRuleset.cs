@@ -4,6 +4,7 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 
 internal sealed class CloudflareRuleset
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Id { get; set; }
 
     public string Name { get; set; } = "Promethix Cloudflare Tunnel Operator rate limits";
@@ -17,6 +18,7 @@ internal sealed class CloudflareRuleset
 
 internal sealed class CloudflareRulesetRule
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Id { get; set; }
 
     public string Action { get; set; } = string.Empty;
