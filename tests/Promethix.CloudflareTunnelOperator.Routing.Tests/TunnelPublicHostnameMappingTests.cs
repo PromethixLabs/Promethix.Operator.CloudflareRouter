@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 using Promethix.CloudflareTunnelOperator.Hosting.Options;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
@@ -473,6 +474,50 @@ public sealed class TunnelPublicHostnameMappingTests
     }
 
     [Fact]
+    public async Task RateLimitSecurityPolicyRequiresZoneMappingWhenMultiZoneSupportIsEnabled()
+    {
+        var client = CreateClient(securityPoliciesEnabled: true);
+        var resource = CreateRateLimitedResource("managed_challenge");
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = managedIntent.Should().BeNull();
+        _ = invalidIntent.Should().NotBeNull();
+        Assert.NotNull(invalidIntent);
+        _ = invalidIntent.Reason.Should().Be(
+            "No Cloudflare zone is configured for hostname 'api.delta.promethix.net'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
+    }
+
+    [Fact]
+    public async Task RateLimitSecurityPolicyUsesLongestMatchingZoneMapping()
+    {
+        var client = CreateClient(
+            securityPoliciesEnabled: true,
+            configureCloudflare: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "promethix.net",
+                    ZoneId = "zone-root",
+                });
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "delta.promethix.net",
+                    ZoneId = "zone-delta",
+                });
+            });
+        var resource = CreateRateLimitedResource("managed_challenge");
+
+        var (managedIntent, invalidIntent) = await client.TryBuildIntentAsync(resource, CancellationToken.None);
+
+        _ = invalidIntent.Should().BeNull();
+        _ = managedIntent.Should().NotBeNull();
+        Assert.NotNull(managedIntent);
+        Assert.NotNull(managedIntent.SecurityPolicy);
+        _ = managedIntent.SecurityPolicy.ZoneId.Should().Be("zone-delta");
+    }
+
+    [Fact]
     public async Task EnterpriseOnlyLogRateLimitActionIsRejectedByDefault()
     {
         var client = CreateClient(securityPoliciesEnabled: true);
@@ -648,6 +693,7 @@ public sealed class TunnelPublicHostnameMappingTests
         Action<KubernetesOperatorOptions>? configure = null,
         bool securityPoliciesEnabled = false,
         Action<RoutingOperatorOptions>? configureRouting = null,
+        Action<CloudflareTunnelOptions>? configureCloudflare = null,
         IHostnameOwnershipValidator? hostnameOwnershipValidator = null)
     {
         var kubernetesOptions = new KubernetesOperatorOptions
@@ -669,12 +715,18 @@ public sealed class TunnelPublicHostnameMappingTests
         };
         configureRouting?.Invoke(routingOperatorOptions);
 
+        var cloudflareOptions = new CloudflareTunnelOptions();
+        configureCloudflare?.Invoke(cloudflareOptions);
+
         return new KubernetesTunnelPublicHostnameClient(
             kubernetes: null!,
             Options.Create(kubernetesOptions),
             Options.Create(routingOperatorOptions),
+            new CloudflareZoneResolver(Options.Create(cloudflareOptions)),
             new ManagedTunnelPublicHostnameValidator(
                 Options.Create(kubernetesOptions),
+                Options.Create(routingOperatorOptions),
+                new CloudflareZoneResolver(Options.Create(cloudflareOptions)),
                 hostnameOwnershipValidator ?? new AcceptingHostnameOwnershipValidator(),
                 new AcceptingIngressTargetValidator()),
             NullLogger<KubernetesTunnelPublicHostnameClient>.Instance);

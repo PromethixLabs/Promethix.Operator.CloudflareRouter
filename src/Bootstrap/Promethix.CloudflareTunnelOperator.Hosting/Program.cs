@@ -79,6 +79,7 @@ builder.Services.AddSingleton<SecurityPolicyReconciler>();
 builder.Services.AddSingleton<OperatorState>();
 builder.Services.AddSingleton<RouteIntentWorkQueue>();
 builder.Services.AddSingleton<IRouteMutationSafetyEvaluator, RouteMutationSafetyEvaluator>();
+builder.Services.AddSingleton<ICloudflareZoneResolver, CloudflareZoneResolver>();
 builder.Services.AddSingleton(_ => KubernetesClientFactory.Create());
 builder.Services.AddSingleton<IIngressTargetValidator, KubernetesIngressTargetValidator>();
 builder.Services.AddSingleton<IKubernetesNamespaceReader, KubernetesNamespaceReader>();

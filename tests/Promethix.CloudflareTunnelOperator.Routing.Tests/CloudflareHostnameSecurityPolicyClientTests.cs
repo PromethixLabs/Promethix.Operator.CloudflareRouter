@@ -113,14 +113,15 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
     {
         return new CloudflareHostnameSecurityPolicyClient(
             httpClient,
-            Options.Create(new CloudflareTunnelOptions
-            {
-                AccountId = "account-id",
-                TunnelId = "tunnel-id",
-                ZoneId = "zone-id",
-                ApiToken = "token",
-                OwnershipTag = "owner",
-            }),
+            new CloudflareZoneResolver(
+                Options.Create(new CloudflareTunnelOptions
+                {
+                    AccountId = "account-id",
+                    TunnelId = "tunnel-id",
+                    ZoneId = "zone-id",
+                    ApiToken = "token",
+                    OwnershipTag = "owner",
+                })),
             NullLogger<CloudflareHostnameSecurityPolicyClient>.Instance);
     }
 
@@ -128,6 +129,7 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
     {
         return new HostnameSecurityPolicy(
             "api.example.com",
+            "zone-id",
             "owner",
             [
                 new HostnameRateLimitRule(

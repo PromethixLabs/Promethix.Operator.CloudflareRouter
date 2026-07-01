@@ -2,6 +2,8 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Promethix.CloudflareTunnelOperator.Hosting.Admission;
+using Promethix.CloudflareTunnelOperator.Routing.Application;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
@@ -119,8 +121,54 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
             "spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
     }
 
-    private static TunnelPublicHostnameAdmissionService CreateService()
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitedHostnameWhenZoneMappingIsMissing()
     {
+        var service = CreateService(routingConfigure: options => options.SecurityPoliciesEnabled = true);
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "No Cloudflare zone is configured for hostname 'whoami.example.com'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
+    }
+
+    private static TunnelPublicHostnameAdmissionService CreateService(
+        Action<RoutingOperatorOptions>? routingConfigure = null,
+        Action<CloudflareTunnelOptions>? cloudflareConfigure = null)
+    {
+        var routingOptions = new RoutingOperatorOptions
+        {
+            OwnershipTag = "promethix-cloudflare-tunnel-operator",
+        };
+        routingConfigure?.Invoke(routingOptions);
+
+        var cloudflareOptions = new CloudflareTunnelOptions();
+        cloudflareConfigure?.Invoke(cloudflareOptions);
+
         var managedValidator = new ManagedTunnelPublicHostnameValidator(
             Options.Create(new KubernetesOperatorOptions
             {
@@ -133,6 +181,8 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
                 OwnershipConfigMapNamespace = "edge-system",
                 OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",
             }),
+            Options.Create(routingOptions),
+            new CloudflareZoneResolver(Options.Create(cloudflareOptions)),
             new AcceptingHostnameOwnershipValidator(),
             new AcceptingIngressTargetValidator());
 

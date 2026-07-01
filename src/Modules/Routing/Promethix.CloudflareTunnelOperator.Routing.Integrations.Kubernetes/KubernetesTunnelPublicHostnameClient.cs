@@ -14,6 +14,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     IKubernetes kubernetes,
     IOptions<KubernetesOperatorOptions> options,
     IOptions<RoutingOperatorOptions> routingOptions,
+    ICloudflareZoneResolver zoneResolver,
     IManagedTunnelPublicHostnameValidator managedValidator,
     ILogger<KubernetesTunnelPublicHostnameClient> logger)
 {
@@ -365,7 +366,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         return PublicHostnameRoute.Create(resource.Spec.Hostname, origin.Url, protocol, ownershipTag);
     }
 
-    private static HostnameSecurityPolicy? ToSecurityPolicy(
+    private HostnameSecurityPolicy? ToSecurityPolicy(
         TunnelPublicHostnameCustomResource resource,
         string ownershipTag,
         bool securityPoliciesEnabled,
@@ -392,7 +393,9 @@ public sealed class KubernetesTunnelPublicHostnameClient(
             .Select(rule => ToRateLimitRule(resource.Spec.Hostname, rule, allowEnterpriseOnlyRateLimitActions))
             .ToArray();
 
-        return new HostnameSecurityPolicy(resource.Spec.Hostname, ownershipTag, rules);
+        var zoneId = zoneResolver.ResolveZoneId(resource.Spec.Hostname);
+
+        return new HostnameSecurityPolicy(resource.Spec.Hostname, zoneId, ownershipTag, rules);
     }
 
     private static HostnameRateLimitRule ToRateLimitRule(

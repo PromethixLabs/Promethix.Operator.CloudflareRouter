@@ -20,6 +20,7 @@ cloudflare:
   accountIdKey: CLOUDFLARE_ACCOUNT_ID
   tunnelIdKey: CLOUDFLARE_TUNNEL_ID
   zoneIdKey: CLOUDFLARE_ZONE_ID
+  zoneMappings: []
 
 operator:
   managedClassName: public

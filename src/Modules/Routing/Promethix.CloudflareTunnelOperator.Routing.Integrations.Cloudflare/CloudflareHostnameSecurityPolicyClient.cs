@@ -10,7 +10,7 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 
 public sealed class CloudflareHostnameSecurityPolicyClient(
     HttpClient httpClient,
-    IOptions<CloudflareTunnelOptions> options,
+    ICloudflareZoneResolver zoneResolver,
     ILogger<CloudflareHostnameSecurityPolicyClient> logger) : ICloudflareHostnameSecurityPolicyClient
 {
     private const string RateLimitPhase = "http_ratelimit";
@@ -35,9 +35,7 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(policy);
-        EnsureZoneConfigured();
-
-        var ruleset = await GetRateLimitRulesetAsync(cancellationToken).ConfigureAwait(false);
+        var ruleset = await GetRateLimitRulesetAsync(policy.ZoneId, cancellationToken).ConfigureAwait(false);
         var plan = BuildPlan(policy, ruleset.Rules);
 
         LogRateLimitPlan(logger, policy.Hostname, plan.ToCreate.Count, plan.ToUpdate.Count, plan.ToDelete.Count, applyChanges, null);
@@ -45,7 +43,7 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         if (applyChanges && plan.HasChanges && plan.Conflicts.Count == 0)
         {
             ApplyPlanToRuleset(policy, ruleset, plan);
-            await SaveRulesetAsync(ruleset, cancellationToken).ConfigureAwait(false);
+            await SaveRulesetAsync(policy.ZoneId, ruleset, cancellationToken).ConfigureAwait(false);
         }
 
         return plan;
@@ -59,9 +57,8 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostname);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownershipTag);
-        EnsureZoneConfigured();
-
-        var ruleset = await GetRateLimitRulesetAsync(cancellationToken).ConfigureAwait(false);
+        var zoneId = zoneResolver.ResolveZoneId(hostname);
+        var ruleset = await GetRateLimitRulesetAsync(zoneId, cancellationToken).ConfigureAwait(false);
         var ownedRules = ruleset.Rules
             .Where(rule => IsManagedRuleForHostname(rule, hostname, ownershipTag))
             .Select(ToDomainRule)
@@ -73,7 +70,7 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         if (applyChanges && plan.HasChanges)
         {
             _ = ruleset.Rules.RemoveAll(rule => IsManagedRuleForHostname(rule, hostname, ownershipTag));
-            await SaveRulesetAsync(ruleset, cancellationToken).ConfigureAwait(false);
+            await SaveRulesetAsync(zoneId, ruleset, cancellationToken).ConfigureAwait(false);
         }
 
         return plan;
@@ -129,10 +126,10 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         }
     }
 
-    private async Task<CloudflareRuleset> GetRateLimitRulesetAsync(CancellationToken cancellationToken)
+    private async Task<CloudflareRuleset> GetRateLimitRulesetAsync(string zoneId, CancellationToken cancellationToken)
     {
         var response = await httpClient.GetAsync(
-            new Uri($"zones/{options.Value.ZoneId}/rulesets/phases/{RateLimitPhase}/entrypoint", UriKind.Relative),
+            new Uri($"zones/{zoneId}/rulesets/phases/{RateLimitPhase}/entrypoint", UriKind.Relative),
             cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
@@ -149,16 +146,16 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         return envelope?.Result ?? new CloudflareRuleset();
     }
 
-    private async Task SaveRulesetAsync(CloudflareRuleset ruleset, CancellationToken cancellationToken)
+    private async Task SaveRulesetAsync(string zoneId, CloudflareRuleset ruleset, CancellationToken cancellationToken)
     {
         var response = string.IsNullOrWhiteSpace(ruleset.Id)
             ? await httpClient.PostAsJsonAsync(
-                new Uri($"zones/{options.Value.ZoneId}/rulesets", UriKind.Relative),
+                new Uri($"zones/{zoneId}/rulesets", UriKind.Relative),
                 ruleset,
                 JsonOptions,
                 cancellationToken).ConfigureAwait(false)
             : await httpClient.PutAsJsonAsync(
-                new Uri($"zones/{options.Value.ZoneId}/rulesets/{ruleset.Id}", UriKind.Relative),
+                new Uri($"zones/{zoneId}/rulesets/{ruleset.Id}", UriKind.Relative),
                 ruleset,
                 JsonOptions,
                 cancellationToken).ConfigureAwait(false);
@@ -171,14 +168,6 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         LogCloudflareWriteRejected(logger, (int)response.StatusCode, responseBody, null);
         _ = response.EnsureSuccessStatusCode();
-    }
-
-    private void EnsureZoneConfigured()
-    {
-        if (string.IsNullOrWhiteSpace(options.Value.ZoneId))
-        {
-            throw new InvalidOperationException("CloudflareTunnel:ZoneId is required when Cloudflare security policy reconciliation is enabled.");
-        }
     }
 
     private static CloudflareRulesetRule ToCloudflareRule(HostnameSecurityPolicy policy, HostnameRateLimitRule rule)

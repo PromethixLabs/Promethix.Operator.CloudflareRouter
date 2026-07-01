@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Options;
+using Promethix.CloudflareTunnelOperator.Routing.Application;
 using Promethix.CloudflareTunnelOperator.Routing.Domain;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 public sealed class ManagedTunnelPublicHostnameValidator(
     IOptions<KubernetesOperatorOptions> options,
+    IOptions<RoutingOperatorOptions> routingOptions,
+    ICloudflareZoneResolver zoneResolver,
     IHostnameOwnershipValidator hostnameOwnershipValidator,
     IIngressTargetValidator ingressTargetValidator) : IManagedTunnelPublicHostnameValidator
 {
@@ -23,6 +26,7 @@ public sealed class ManagedTunnelPublicHostnameValidator(
 
         ValidateAllowedHostnameSuffixes(resource);
         await hostnameOwnershipValidator.ValidateAsync(resource, cancellationToken).ConfigureAwait(false);
+        ValidateSecurityPolicyZoneResolution(resource);
 
         var target = resource.Spec.Target;
         if (target is null || string.IsNullOrWhiteSpace(target.Mode))
@@ -94,6 +98,22 @@ public sealed class ManagedTunnelPublicHostnameValidator(
         }
 
         await ingressTargetValidator.ValidateAsync(resource, ingress, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void ValidateSecurityPolicyZoneResolution(TunnelPublicHostnameCustomResource resource)
+    {
+        if (!routingOptions.Value.SecurityPoliciesEnabled)
+        {
+            return;
+        }
+
+        var rateLimit = resource.Spec.Cloudflare.Security?.RateLimit;
+        if (rateLimit is not { Enabled: true })
+        {
+            return;
+        }
+
+        _ = zoneResolver.ResolveZoneId(resource.Spec.Hostname);
     }
 
     private bool IsIngressServiceOverrideAllowed(TunnelIngressServiceTargetSpec service)
