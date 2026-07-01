@@ -52,7 +52,7 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         _ = rule.GetProperty("description").GetString().Should().Be("promethix-cloudflare-tunnel-operator:owner:api.example.com:api-v1");
         _ = rule.GetProperty("ratelimit").GetProperty("period").GetInt32().Should().Be(60);
         _ = rule.GetProperty("ratelimit").GetProperty("requests_per_period").GetInt32().Should().Be(60);
-        _ = rule.GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
+        _ = rule.GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(0);
     }
 
     [Fact]
@@ -99,6 +99,36 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         using var document = JsonDocument.Parse(body);
 
         _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("requests_per_period").GetInt32().Should().Be(60);
+    }
+
+    [Fact]
+    public async Task ReconcileShouldUsePeriodAsMitigationTimeoutForBlockAction()
+    {
+        using var handler = new RecordingHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.NotFound),
+            JsonResponse("""{"success":true,"result":{"id":"ruleset-id"}}"""));
+        using var httpClient = CreateHttpClient(handler);
+        var client = CreateClient(httpClient);
+        var policy = new HostnameSecurityPolicy(
+            "api.example.com",
+            "zone-id",
+            "owner",
+            [
+                new HostnameRateLimitRule(
+                    "api-v1",
+                    "(http.host eq \"api.example.com\" and starts_with(http.request.uri.path, \"/v1/\"))",
+                    60,
+                    60,
+                    "block"),
+            ]);
+
+        _ = await client.ReconcileAsync(policy, applyChanges: true, CancellationToken.None);
+
+        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Post).Subject;
+        var body = await write.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+
+        _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
     }
 
     private static HttpClient CreateHttpClient(HttpMessageHandler handler)

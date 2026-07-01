@@ -182,9 +182,17 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
             {
                 Period = rule.PeriodSeconds,
                 RequestsPerPeriod = rule.RequestsPerPeriod,
-                MitigationTimeout = rule.PeriodSeconds,
+                MitigationTimeout = ResolveMitigationTimeout(rule),
             },
         };
+    }
+
+    private static int ResolveMitigationTimeout(HostnameRateLimitRule rule)
+    {
+        return string.Equals(rule.Action, "challenge", StringComparison.Ordinal)
+               || string.Equals(rule.Action, "managed_challenge", StringComparison.Ordinal)
+            ? 0
+            : rule.PeriodSeconds;
     }
 
     private static HostnameRateLimitRule ToDomainRule(CloudflareRulesetRule rule)
