@@ -30,6 +30,27 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
     }
 
     [Fact]
+    public async Task ValidateAsyncShouldAllowDeletingManagedResourceUpdates()
+    {
+        var service = CreateService();
+        var resource = CreateResource("public", "delta-public", "rate-limit-test.promethix.dev");
+        resource.Metadata.DeletionTimestamp = DateTime.UtcNow;
+        resource.Spec.Target = new TunnelTargetSpec
+        {
+            Mode = "ingress",
+            Ingress = new TunnelIngressTargetSpec
+            {
+                ClassName = "traefik-cloudflare-tunnel",
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("UPDATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ValidateAsyncShouldAllowUnmanagedResources()
     {
         var service = CreateService();

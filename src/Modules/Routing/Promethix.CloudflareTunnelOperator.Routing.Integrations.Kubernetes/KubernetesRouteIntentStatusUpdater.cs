@@ -89,7 +89,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                     "Route intent is valid.",
                     "False",
                     "NotDeleting",
-                    "Resource is not being deleted."),
+                    "Resource is not being deleted.",
+                    intent.SecurityPolicy is null),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -122,7 +123,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                     "Route intent is valid.",
                     "False",
                     "NotDeleting",
-                    "Resource is not being deleted."),
+                    "Resource is not being deleted.",
+                    intentRoute.SecurityPolicy is null),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -147,7 +149,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 invalidIntent.Reason,
                 "False",
                 "NotDeleting",
-                "Resource is not being deleted."),
+                "Resource is not being deleted.",
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -234,7 +237,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "True",
                 "CleanupPending",
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -263,7 +267,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "True",
                 reason,
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -291,7 +296,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "False",
                 "CleanedUp",
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -432,7 +438,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
         string specValidMessage,
         string cleanupStatus,
         string cleanupReason,
-        string cleanupMessage)
+        string cleanupMessage,
+        bool securityPolicyNotRequested)
     {
         var status = new TunnelPublicHostnameStatus
         {
@@ -445,7 +452,10 @@ public sealed class KubernetesRouteIntentStatusUpdater(
         status.Conditions.Add(CreateCondition("Ready", readyStatus, readyReason, readyMessage, observedGeneration));
         status.Conditions.Add(CreateCondition("SpecValid", specValidStatus, specValidReason, specValidMessage, observedGeneration));
         status.Conditions.Add(CreateCondition("Cleanup", cleanupStatus, cleanupReason, cleanupMessage, observedGeneration));
-        status.Conditions.Add(CreateCondition("SecurityPolicyReady", "True", "NotRequested", "No security policy reconciliation requested.", observedGeneration));
+        status.Conditions.Add(
+            securityPolicyNotRequested
+                ? CreateCondition("SecurityPolicyReady", "True", "NotRequested", "No security policy reconciliation requested.", observedGeneration)
+                : CreateCondition("SecurityPolicyReady", "False", "Pending", "Security policy reconciliation pending.", observedGeneration));
         return status;
     }
 

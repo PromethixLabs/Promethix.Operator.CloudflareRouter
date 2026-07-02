@@ -40,8 +40,8 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         var plan = await client.ReconcileAsync(CreatePolicy(), applyChanges: true, CancellationToken.None);
 
         _ = plan.ToCreate.Should().ContainSingle();
-        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Post).Subject;
-        _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets");
+        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Put).Subject;
+        _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets/phases/http_ratelimit/entrypoint");
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
         var rule = document.RootElement.GetProperty("rules")[0];
@@ -96,7 +96,7 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
 
         _ = plan.ToUpdate.Should().ContainSingle();
         var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Put).Subject;
-        _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets/ruleset-id");
+        _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets/phases/http_ratelimit/entrypoint");
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
 
@@ -126,13 +126,58 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
 
         _ = await client.ReconcileAsync(policy, applyChanges: true, CancellationToken.None);
 
-        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Post).Subject;
+        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Put).Subject;
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
 
         _ = document.RootElement.TryGetProperty("id", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].TryGetProperty("id", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
+    }
+
+    [Fact]
+    public async Task CleanupShouldUpdateEntrypointRulesetWhenDeletingManagedRules()
+    {
+        var existingRuleset = """
+            {
+              "success": true,
+              "result": {
+                "id": "ruleset-id",
+                "name": "existing",
+                "kind": "zone",
+                "phase": "http_ratelimit",
+                "rules": [
+                  {
+                    "id": "rule-id",
+                    "action": "block",
+                    "expression": "(http.host eq \"api.example.com\" and starts_with(http.request.uri.path, \"/v1/\"))",
+                    "description": "promethix-cloudflare-tunnel-operator:owner:api.example.com:api-v1",
+                    "enabled": true,
+                    "ratelimit": {
+                      "period": 60,
+                      "requests_per_period": 60,
+                      "mitigation_timeout": 60,
+                      "characteristics": ["cf.colo.id", "ip.src"]
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+        using var handler = new RecordingHttpMessageHandler(
+            JsonResponse(existingRuleset),
+            JsonResponse("""{"success":true,"result":{"id":"ruleset-id"}}"""));
+        using var httpClient = CreateHttpClient(handler);
+        var client = CreateClient(httpClient);
+
+        var plan = await client.CleanupAsync("api.example.com", "owner", applyChanges: true, CancellationToken.None);
+
+        _ = plan.ToDelete.Should().ContainSingle();
+        var write = handler.Requests.Should().ContainSingle(request => request.Method == HttpMethod.Put).Subject;
+        _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets/phases/http_ratelimit/entrypoint");
+        var body = await write.Content!.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        _ = document.RootElement.GetProperty("rules").GetArrayLength().Should().Be(0);
     }
 
     private static HttpClient CreateHttpClient(HttpMessageHandler handler)

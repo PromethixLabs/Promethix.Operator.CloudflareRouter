@@ -148,17 +148,11 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
 
     private async Task SaveRulesetAsync(string zoneId, CloudflareRuleset ruleset, CancellationToken cancellationToken)
     {
-        var response = string.IsNullOrWhiteSpace(ruleset.Id)
-            ? await httpClient.PostAsJsonAsync(
-                new Uri($"zones/{zoneId}/rulesets", UriKind.Relative),
-                ruleset,
-                JsonOptions,
-                cancellationToken).ConfigureAwait(false)
-            : await httpClient.PutAsJsonAsync(
-                new Uri($"zones/{zoneId}/rulesets/{ruleset.Id}", UriKind.Relative),
-                ruleset,
-                JsonOptions,
-                cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PutAsJsonAsync(
+            new Uri($"zones/{zoneId}/rulesets/phases/{RateLimitPhase}/entrypoint", UriKind.Relative),
+            ToWriteModel(ruleset),
+            JsonOptions,
+            cancellationToken).ConfigureAwait(false);
 
         if (response.IsSuccessStatusCode)
         {
@@ -168,6 +162,28 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         LogCloudflareWriteRejected(logger, (int)response.StatusCode, responseBody, null);
         _ = response.EnsureSuccessStatusCode();
+    }
+
+    private static CloudflareRulesetWriteModel ToWriteModel(CloudflareRuleset ruleset)
+    {
+        return new CloudflareRulesetWriteModel
+        {
+            Name = ruleset.Name,
+            Kind = ruleset.Kind,
+            Phase = ruleset.Phase,
+            Rules =
+            [
+                .. ruleset.Rules.Select(
+                    rule => new CloudflareRulesetRuleWriteModel
+                    {
+                        Action = rule.Action,
+                        Expression = rule.Expression,
+                        Description = rule.Description,
+                        Enabled = rule.Enabled,
+                        Ratelimit = rule.Ratelimit,
+                    }),
+            ],
+        };
     }
 
     private static CloudflareRulesetRule ToCloudflareRule(HostnameSecurityPolicy policy, HostnameRateLimitRule rule)

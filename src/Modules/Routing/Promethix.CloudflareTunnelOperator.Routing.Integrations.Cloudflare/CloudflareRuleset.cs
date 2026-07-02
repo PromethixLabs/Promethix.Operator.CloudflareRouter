@@ -16,11 +16,36 @@ internal sealed class CloudflareRuleset
     public List<CloudflareRulesetRule> Rules { get; set; } = [];
 }
 
+internal sealed class CloudflareRulesetWriteModel
+{
+    public string Name { get; set; } = "Promethix Cloudflare Tunnel Operator rate limits";
+
+    public string Kind { get; set; } = "zone";
+
+    public string Phase { get; set; } = "http_ratelimit";
+
+    public List<CloudflareRulesetRuleWriteModel> Rules { get; set; } = [];
+}
+
 internal sealed class CloudflareRulesetRule
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Id { get; set; }
 
+    public string Action { get; set; } = string.Empty;
+
+    public string Expression { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; } = true;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CloudflareRateLimit? Ratelimit { get; set; }
+}
+
+internal sealed class CloudflareRulesetRuleWriteModel
+{
     public string Action { get; set; } = string.Empty;
 
     public string Expression { get; set; } = string.Empty;
