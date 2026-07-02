@@ -72,7 +72,7 @@ Before you start:
 Add the Helm repository:
 
 ```powershell
-helm repo add promethix https://promethixlabs.github.io/charts
+helm repo add promethix https://charts.promethix.dev
 helm repo update
 ```
 
@@ -131,7 +131,7 @@ If you want more control than the quick start, use the full Helm configuration b
 Add the public Helm repository:
 
 ```powershell
-helm repo add promethix https://promethixlabs.github.io/charts
+helm repo add promethix https://charts.promethix.dev
 helm repo update
 ```
 

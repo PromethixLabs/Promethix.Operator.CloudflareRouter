@@ -431,7 +431,7 @@ steps:
       - 'ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null || { echo "Invalid GitHub Pages SSH private key format"; exit 1; }'
       - 'GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git clone --branch gh-pages --depth 1 git@github.com:promethixlabs/charts.git /tmp/gh-pages'
       - 'cp .helm-dist/*.tgz /tmp/gh-pages/'
-      - 'helm repo index /tmp/gh-pages --url https://promethixlabs.github.io/charts --merge /tmp/gh-pages/index.yaml'
+      - 'helm repo index /tmp/gh-pages --url https://charts.promethix.dev --merge /tmp/gh-pages/index.yaml'
       - 'cd /tmp/gh-pages'
       - 'git config user.name "Drone CI"'
       - 'git config user.email "drone@users.noreply.github.com"'
