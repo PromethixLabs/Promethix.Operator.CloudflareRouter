@@ -27,5 +27,5 @@ spec:
           - name: api-v1
             pathPrefix: /v1/
             requestsPerPeriod: 60
-            periodSeconds: 60
+            periodSeconds: 10
             action: managed_challenge

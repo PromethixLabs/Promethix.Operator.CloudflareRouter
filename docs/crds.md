@@ -108,7 +108,7 @@ spec:
           - name: api-v1
             pathPrefix: /v1/
             requestsPerPeriod: 60
-            periodSeconds: 60
+            periodSeconds: 10
             action: managed_challenge
 ```
 
@@ -119,6 +119,8 @@ The intended implementation boundary is:
 - security rules use operator ownership markers
 - unmanaged Cloudflare rules are preserved
 - `operator.applyChanges=false` plans security changes without applying them
+- the current validated operator contract supports `periodSeconds: 10`
+- unsupported expressions such as `cf.client.bot_score` are rejected before reconcile
 
 Security policy reconciliation requires a Cloudflare zone id in addition to the account and tunnel ids.
 

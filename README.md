@@ -221,6 +221,8 @@ That preserves compatibility with explicit shared-ingress declarations while den
 
 Per-hostname Cloudflare rate-limit reconciliation is also disabled by default. To enable it, set `operator.securityPolicies.enabled=true`. This is an advanced feature and requires additional Cloudflare zone/ruleset permissions beyond the basic tunnel-only token used for route reconciliation.
 The `log` rate-limit action is treated as Enterprise-only and is rejected by default; enable `operator.allowEnterpriseOnlyRateLimitActions=true` only if your Cloudflare zone supports it.
+The current validated rate-limit contract uses `periodSeconds: 10`; unsupported period values are rejected during validation before Cloudflare is called.
+For `http_ratelimit`, prefer `pathPrefix`-based rules or expressions limited to hostname/path predicates supported by that phase. Unsupported identifiers such as `cf.client.bot_score` are rejected before reconcile.
 
 To install from a local checkout instead, replace the chart reference with `./charts/promethix-cloudflare-tunnel-operator`.
 
