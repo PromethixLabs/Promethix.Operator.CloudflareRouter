@@ -120,6 +120,34 @@ public sealed class RouteMutationSafetyEvaluatorTests
     }
 
     [Fact]
+    public async Task TargetedReconcileShouldProceedAfterWatchActivityWhenFullReconcileWasBlockedByDeleteBudget()
+    {
+        var state = new OperatorState();
+        state.MarkInitialFullInventoryPass(
+            DateTimeOffset.UtcNow,
+            startupSafeForMutation: false,
+            reason: "ProtectiveDeleteGuardTriggered",
+            message: "Planned delete count 4 exceeds the configured maximum of 1.");
+        _ = state.MarkWatchActivityObserved();
+
+        var evaluator = new RouteMutationSafetyEvaluator(
+            new StubOwnershipStore(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            state,
+            NullLogger<RouteMutationSafetyEvaluator>.Instance);
+
+        var intent = new ManagedRouteIntent("app", "demo", 1, CreateRoute("one.example.com"));
+        var plan = new RoutePlan([], [CreateRoute("one.example.com")], [], []);
+
+        var decision = await evaluator.EvaluateManagedRouteReconcileAsync(
+            CreateOptions(),
+            intent,
+            plan,
+            CancellationToken.None);
+
+        _ = decision.AllowApply.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task CleanupShouldRespectMutationMode()
     {
         var state = new OperatorState();
@@ -152,6 +180,33 @@ public sealed class RouteMutationSafetyEvaluatorTests
             startupSafeForMutation: false,
             reason: "StartupInventoryIncomplete",
             message: "Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
+        _ = state.MarkWatchActivityObserved();
+
+        var evaluator = new RouteMutationSafetyEvaluator(
+            new StubOwnershipStore(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            state,
+            NullLogger<RouteMutationSafetyEvaluator>.Instance);
+
+        var plan = new RoutePlan([], [], [CreateRoute("one.example.com")], []);
+
+        var decision = await evaluator.EvaluateCleanupAsync(
+            CreateOptions(mutationMode: "Full"),
+            "one.example.com",
+            plan,
+            CancellationToken.None);
+
+        _ = decision.AllowApply.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CleanupShouldProceedAfterWatchActivityWhenFullReconcileWasBlockedByDeleteBudget()
+    {
+        var state = new OperatorState();
+        state.MarkInitialFullInventoryPass(
+            DateTimeOffset.UtcNow,
+            startupSafeForMutation: false,
+            reason: "ProtectiveDeleteGuardTriggered",
+            message: "Planned delete count 4 exceeds the configured maximum of 1.");
         _ = state.MarkWatchActivityObserved();
 
         var evaluator = new RouteMutationSafetyEvaluator(

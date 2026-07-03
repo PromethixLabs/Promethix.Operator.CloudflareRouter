@@ -130,10 +130,8 @@ internal sealed class RouteMutationSafetyEvaluator(
 
     private bool IsStartupSafeForTargetedMutation()
     {
-        return state.IsStartupSafeForMutation
-            || (state.HasCompletedInitialFullInventoryPass
-                && state.HasObservedWatchActivity
-                && string.Equals(state.StartupBlockReason, StartupInventoryIncompleteReason, StringComparison.Ordinal));
+        return state.HasCompletedInitialFullInventoryPass
+            && state.HasObservedWatchActivity;
     }
 
     private static RouteMutationSafetyDecision EvaluateMutationMode(RoutingOperatorOptions options, RoutePlan plan)
