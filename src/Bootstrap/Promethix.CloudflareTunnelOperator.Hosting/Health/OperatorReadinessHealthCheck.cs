@@ -73,7 +73,7 @@ internal sealed class OperatorReadinessHealthCheck(
             return false;
         }
 
-        result = HealthCheckResult.Unhealthy(
+        result = HealthCheckResult.Degraded(
             state.StartupBlockMessage ?? "Cloudflare writes are blocked because startup safety checks have not passed.",
             data: new Dictionary<string, object>
             {

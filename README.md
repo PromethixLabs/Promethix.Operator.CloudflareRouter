@@ -55,6 +55,7 @@ Example manifests are in [examples](examples):
 - [direct-origin-app.yaml](examples/direct-origin-app.yaml)
 - [tenant-rbac.yaml](examples/tenant-rbac.yaml)
 - [flux](examples/flux)
+- [rate-limited-ingress-app.yaml](examples/rate-limited-ingress-app.yaml)
 
 The examples are intentionally generic and use placeholder values. Replace hostnames, tunnel names, secrets, and ingress details for your cluster.
 
@@ -71,7 +72,7 @@ Before you start:
 Add the Helm repository:
 
 ```powershell
-helm repo add promethix https://promethixlabs.github.io/charts
+helm repo add promethix https://charts.promethix.dev
 helm repo update
 ```
 
@@ -121,6 +122,8 @@ If you use Flux instead of manual Helm, start with:
 - [examples/flux/README.md](examples/flux/README.md)
 - [examples/flux/helmrelease.yaml](examples/flux/helmrelease.yaml)
 
+CRD usage notes are in [docs/crds.md](docs/crds.md).
+
 ## Manual Helm Deployment
 
 If you want more control than the quick start, use the full Helm configuration below.
@@ -128,7 +131,7 @@ If you want more control than the quick start, use the full Helm configuration b
 Add the public Helm repository:
 
 ```powershell
-helm repo add promethix https://promethixlabs.github.io/charts
+helm repo add promethix https://charts.promethix.dev
 helm repo update
 ```
 
@@ -146,6 +149,8 @@ kubectl create secret generic cloudflare-tunnel-operator `
   --from-literal=CLOUDFLARE_ACCOUNT_ID=replace-me `
   --from-literal=CLOUDFLARE_TUNNEL_ID=replace-me
 ```
+
+Add `CLOUDFLARE_ZONE_ID` only when you enable `operator.securityPolicies.enabled=true` and you are using the legacy single-zone fallback. For multi-zone setups, prefer `cloudflare.zoneMappings` in Helm values instead.
 
 Annotate each tenant namespace with the hostname suffixes it is allowed to claim:
 
@@ -214,6 +219,11 @@ For shared clusters, the recommended ingress posture is:
 
 That preserves compatibility with explicit shared-ingress declarations while denying arbitrary ingress service overrides.
 
+Per-hostname Cloudflare rate-limit reconciliation is also disabled by default. To enable it, set `operator.securityPolicies.enabled=true`. This is an advanced feature and requires additional Cloudflare zone/ruleset permissions beyond the basic tunnel-only token used for route reconciliation.
+The `log` rate-limit action is treated as Enterprise-only and is rejected by default; enable `operator.allowEnterpriseOnlyRateLimitActions=true` only if your Cloudflare zone supports it.
+The current validated rate-limit contract uses `periodSeconds: 10`; unsupported period values are rejected during validation before Cloudflare is called.
+For `http_ratelimit`, prefer `pathPrefix`-based rules or expressions limited to hostname/path predicates supported by that phase. Unsupported identifiers such as `cf.client.bot_score` are rejected before reconcile.
+
 To install from a local checkout instead, replace the chart reference with `./charts/promethix-cloudflare-tunnel-operator`.
 
 For GitOps deployments, use the sample manifests in [examples/flux](examples/flux) as a starting point.
@@ -256,7 +266,7 @@ Health endpoints:
 
 This project is still under active development. The core reconciliation and Kubernetes integration are in place, but the operator is not yet feature-complete.
 
-Design notes are in [docs/architecture.md](docs/architecture.md).
+Architecture notes are in [docs/architecture.md](docs/architecture.md).
 
 ## License
 

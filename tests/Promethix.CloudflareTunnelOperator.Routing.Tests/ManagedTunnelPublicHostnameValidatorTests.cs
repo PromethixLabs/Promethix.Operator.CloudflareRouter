@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Promethix.CloudflareTunnelOperator.Routing.Application;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
@@ -127,7 +129,174 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         _ = await act.Should().NotThrowAsync();
     }
 
-    private static ManagedTunnelPublicHostnameValidator CreateValidator(Action<KubernetesOperatorOptions>? configure = null)
+    [Fact]
+    public async Task ValidateAsyncRejectsRateLimitedHostnameWithoutZoneMapping()
+    {
+        var validator = CreateValidator(routingConfigure: options => options.SecurityPoliciesEnabled = true);
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 10,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "No Cloudflare zone is configured for hostname 'whoami.apps.example.com'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
+    }
+
+    [Fact]
+    public async Task ValidateAsyncAllowsRateLimitedHostnameWhenZoneMappingMatches()
+    {
+        var validator = CreateValidator(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "apps.example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 10,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        _ = await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ValidateAsyncRejectsRateLimitedHostnameWhenPeriodIsUnsupported()
+    {
+        var validator = CreateValidator(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "apps.example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].periodSeconds value '60' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: 10.");
+    }
+
+
+    [Fact]
+    public async Task ValidateAsyncRejectsRateLimitExpressionWithUnsupportedBotScoreIdentifier()
+    {
+        var validator = CreateValidator(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "apps.example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            Expression = "cf.client.bot_score < 1",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 10,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier 'cf.client.bot_score' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
+    }
+    private static ManagedTunnelPublicHostnameValidator CreateValidator(
+        Action<KubernetesOperatorOptions>? configure = null,
+        Action<RoutingOperatorOptions>? routingConfigure = null,
+        Action<CloudflareTunnelOptions>? cloudflareConfigure = null)
     {
         var options = new KubernetesOperatorOptions
         {
@@ -142,8 +311,19 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
 
         configure?.Invoke(options);
 
+        var routingOptions = new RoutingOperatorOptions
+        {
+            OwnershipTag = "promethix-cloudflare-tunnel-operator",
+        };
+        routingConfigure?.Invoke(routingOptions);
+
+        var cloudflareOptions = new CloudflareTunnelOptions();
+        cloudflareConfigure?.Invoke(cloudflareOptions);
+
         return new ManagedTunnelPublicHostnameValidator(
             Options.Create(options),
+            Options.Create(routingOptions),
+            new CloudflareZoneResolver(Options.Create(cloudflareOptions)),
             new AcceptingHostnameOwnershipValidator(),
             new AcceptingIngressTargetValidator());
     }
@@ -199,3 +379,4 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         }
     }
 }
+

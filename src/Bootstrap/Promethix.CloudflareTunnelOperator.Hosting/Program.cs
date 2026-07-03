@@ -75,9 +75,11 @@ builder.Services.AddSingleton<IValidateOptions<KubernetesOperatorOptions>, Kuber
 
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<RouteReconciler>();
+builder.Services.AddSingleton<SecurityPolicyReconciler>();
 builder.Services.AddSingleton<OperatorState>();
 builder.Services.AddSingleton<RouteIntentWorkQueue>();
 builder.Services.AddSingleton<IRouteMutationSafetyEvaluator, RouteMutationSafetyEvaluator>();
+builder.Services.AddSingleton<ICloudflareZoneResolver, CloudflareZoneResolver>();
 builder.Services.AddSingleton(_ => KubernetesClientFactory.Create());
 builder.Services.AddSingleton<IIngressTargetValidator, KubernetesIngressTargetValidator>();
 builder.Services.AddSingleton<IKubernetesNamespaceReader, KubernetesNamespaceReader>();
@@ -89,6 +91,14 @@ builder.Services.AddSingleton<IClusterRouteIntentSource, KubernetesRouteIntentSo
 builder.Services.AddSingleton<IManagedRouteOwnershipStore, KubernetesOwnershipStore>();
 builder.Services.AddSingleton<IRouteIntentStatusUpdater, KubernetesRouteIntentStatusUpdater>();
 builder.Services.AddHttpClient<ICloudflareTunnelRouteClient, CloudflareTunnelRouteClient>(
+    (serviceProvider, httpClient) =>
+    {
+        var tunnelOptions = serviceProvider.GetRequiredService<IOptions<CloudflareTunnelOptions>>();
+        httpClient.BaseAddress = new Uri("https://api.cloudflare.com/client/v4/");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tunnelOptions.Value.ApiToken);
+    });
+builder.Services.AddHttpClient<ICloudflareHostnameSecurityPolicyClient, CloudflareHostnameSecurityPolicyClient>(
     (serviceProvider, httpClient) =>
     {
         var tunnelOptions = serviceProvider.GetRequiredService<IOptions<CloudflareTunnelOptions>>();
@@ -135,7 +145,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
     ResultStatusCodes =
     {
         [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
         [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
     },
 });
@@ -168,3 +178,4 @@ static bool TryLoadWebhookCertificate(
         return false;
     }
 }
+

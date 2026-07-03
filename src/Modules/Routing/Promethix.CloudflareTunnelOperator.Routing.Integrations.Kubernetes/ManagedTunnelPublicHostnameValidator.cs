@@ -1,13 +1,19 @@
 using Microsoft.Extensions.Options;
+using Promethix.CloudflareTunnelOperator.Routing.Application;
 using Promethix.CloudflareTunnelOperator.Routing.Domain;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 public sealed class ManagedTunnelPublicHostnameValidator(
     IOptions<KubernetesOperatorOptions> options,
+    IOptions<RoutingOperatorOptions> routingOptions,
+    ICloudflareZoneResolver zoneResolver,
     IHostnameOwnershipValidator hostnameOwnershipValidator,
     IIngressTargetValidator ingressTargetValidator) : IManagedTunnelPublicHostnameValidator
 {
+    private static readonly string[] UnsupportedRateLimitIdentifiers = ["cf.client.bot_score"];
+    private static readonly int[] SupportedRateLimitPeriods = [10];
+
     public bool IsManaged(TunnelPublicHostnameCustomResource resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
@@ -23,6 +29,7 @@ public sealed class ManagedTunnelPublicHostnameValidator(
 
         ValidateAllowedHostnameSuffixes(resource);
         await hostnameOwnershipValidator.ValidateAsync(resource, cancellationToken).ConfigureAwait(false);
+        ValidateSecurityPolicyZoneResolution(resource);
 
         var target = resource.Spec.Target;
         if (target is null || string.IsNullOrWhiteSpace(target.Mode))
@@ -94,6 +101,63 @@ public sealed class ManagedTunnelPublicHostnameValidator(
         }
 
         await ingressTargetValidator.ValidateAsync(resource, ingress, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void ValidateSecurityPolicyZoneResolution(TunnelPublicHostnameCustomResource resource)
+    {
+        if (!routingOptions.Value.SecurityPoliciesEnabled)
+        {
+            return;
+        }
+
+        var rateLimit = resource.Spec.Cloudflare.Security?.RateLimit;
+        if (rateLimit is not { Enabled: true })
+        {
+            return;
+        }
+
+        ValidateRateLimitRules(rateLimit.Rules);
+        _ = zoneResolver.ResolveZoneId(resource.Spec.Hostname);
+    }
+
+    private static void ValidateRateLimitRules(IReadOnlyCollection<CloudflareRateLimitRuleSpec> rules)
+    {
+        foreach (var rule in rules)
+        {
+            ValidateRateLimitPeriod(rule);
+            ValidateRateLimitExpression(rule);
+        }
+    }
+
+    private static void ValidateRateLimitPeriod(CloudflareRateLimitRuleSpec rule)
+    {
+        if (rule.PeriodSeconds <= 0 || SupportedRateLimitPeriods.Contains(rule.PeriodSeconds))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"spec.cloudflare.security.rateLimit.rules[].periodSeconds value '{rule.PeriodSeconds}' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: {string.Join(", ", SupportedRateLimitPeriods)}.");
+    }
+
+    private static void ValidateRateLimitExpression(CloudflareRateLimitRuleSpec rule)
+    {
+        if (string.IsNullOrWhiteSpace(rule.Expression))
+        {
+            return;
+        }
+
+        var expression = rule.Expression.Trim();
+        var unsupportedIdentifier = UnsupportedRateLimitIdentifiers.FirstOrDefault(identifier =>
+            expression.Contains(identifier, StringComparison.OrdinalIgnoreCase));
+
+        if (unsupportedIdentifier is null)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier '{unsupportedIdentifier}' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
     }
 
     private bool IsIngressServiceOverrideAllowed(TunnelIngressServiceTargetSpec service)

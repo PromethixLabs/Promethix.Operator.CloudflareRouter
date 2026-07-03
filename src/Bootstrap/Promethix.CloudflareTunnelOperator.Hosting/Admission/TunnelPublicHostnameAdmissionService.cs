@@ -49,6 +49,12 @@ internal sealed class TunnelPublicHostnameAdmissionService(
             return CreateAllowedResponse(request.Uid);
         }
 
+        if (string.Equals(request.Operation, "UPDATE", StringComparison.OrdinalIgnoreCase)
+            && resource.Metadata.DeletionTimestamp is not null)
+        {
+            return CreateAllowedResponse(request.Uid);
+        }
+
         try
         {
             await managedValidator.ValidateAsync(resource, cancellationToken).ConfigureAwait(false);

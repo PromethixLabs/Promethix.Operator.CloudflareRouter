@@ -18,5 +18,9 @@ public sealed class RoutingOperatorOptions
 
     public int MaxDeletePercentage { get; set; } = 50;
 
+    public bool SecurityPoliciesEnabled { get; set; }
+
+    public bool AllowEnterpriseOnlyRateLimitActions { get; set; }
+
     public string ManagedByLabelValue { get; set; } = "promethix-cloudflare-tunnel-operator";
 }

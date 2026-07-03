@@ -34,6 +34,23 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.cloudflare.existingSecretName }}
                   key: {{ .Values.cloudflare.tunnelIdKey }}
+            {{- if .Values.operator.securityPolicies.enabled }}
+            {{- $zoneMappings := .Values.cloudflare.zoneMappings | default (list) }}
+            {{- if gt (len $zoneMappings) 0 }}
+            {{- range $index, $mapping := $zoneMappings }}
+            - name: CloudflareTunnel__ZoneMappings__{{ $index }}__HostnameSuffix
+              value: {{ $mapping.hostnameSuffix | quote }}
+            - name: CloudflareTunnel__ZoneMappings__{{ $index }}__ZoneId
+              value: {{ $mapping.zoneId | quote }}
+            {{- end }}
+            {{- else if .Values.cloudflare.zoneIdKey }}
+            - name: CloudflareTunnel__ZoneId
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.cloudflare.existingSecretName }}
+                  key: {{ .Values.cloudflare.zoneIdKey }}
+            {{- end }}
+            {{- end }}
             - name: KubernetesOperator__ManagedClassName
               value: {{ .Values.operator.managedClassName | quote }}
             - name: KubernetesOperator__ManagedTunnelName
@@ -74,6 +91,10 @@ spec:
               value: {{ .Values.operator.maxDeleteCount | quote }}
             - name: RoutingOperator__MaxDeletePercentage
               value: {{ .Values.operator.maxDeletePercentage | quote }}
+            - name: RoutingOperator__SecurityPoliciesEnabled
+              value: {{ .Values.operator.securityPolicies.enabled | quote }}
+            - name: RoutingOperator__AllowEnterpriseOnlyRateLimitActions
+              value: {{ .Values.operator.allowEnterpriseOnlyRateLimitActions | quote }}
             - name: RoutingOperator__ReconciliationIntervalSeconds
               value: {{ .Values.operator.reconciliationIntervalSeconds | quote }}
             - name: AdmissionWebhook__Enabled

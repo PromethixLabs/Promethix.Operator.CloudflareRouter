@@ -89,7 +89,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                     "Route intent is valid.",
                     "False",
                     "NotDeleting",
-                    "Resource is not being deleted."),
+                    "Resource is not being deleted.",
+                    intent.SecurityPolicy is null),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -122,7 +123,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                     "Route intent is valid.",
                     "False",
                     "NotDeleting",
-                    "Resource is not being deleted."),
+                    "Resource is not being deleted.",
+                    intentRoute.SecurityPolicy is null),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -147,7 +149,67 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 invalidIntent.Reason,
                 "False",
                 "NotDeleting",
-                "Resource is not being deleted."),
+                "Resource is not being deleted.",
+                securityPolicyNotRequested: false),
+            cancellationToken);
+    }
+
+    public Task UpdateSecurityPolicyAsync(
+        ManagedRouteIntent intent,
+        SecurityPolicyReconciliationResult? result,
+        Exception? failure,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(intent);
+
+        var status = "True";
+        var reason = "Reconciled";
+        var message = "Security policy reconciled.";
+
+        if (intent.SecurityPolicy is null)
+        {
+            reason = "NotRequested";
+            message = "No security policy reconciliation requested.";
+        }
+        else if (failure is not null)
+        {
+            status = "False";
+            reason = "ReconcileFailed";
+            message = failure.Message;
+        }
+        else if (result is not null && result.Plan.Conflicts.Count > 0)
+        {
+            status = "False";
+            reason = "Conflict";
+            message = "Security policy contains conflicts.";
+        }
+        else if (result is not null && result.Plan.HasChanges && !result.ChangesApplied)
+        {
+            status = "False";
+            reason = "Planned";
+            message = "Security policy change planned but not applied.";
+        }
+
+        return UpdateConditionAsync(
+            intent.Namespace,
+            intent.Name,
+            CreateCondition("SecurityPolicyReady", status, reason, message, intent.Generation),
+            cancellationToken);
+    }
+
+    public Task UpdateSecurityPolicyConditionAsync(
+        string resourceNamespace,
+        string name,
+        long? observedGeneration,
+        string status,
+        string reason,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        return UpdateConditionAsync(
+            resourceNamespace,
+            name,
+            CreateCondition("SecurityPolicyReady", status, reason, message, observedGeneration),
             cancellationToken);
     }
 
@@ -175,7 +237,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "True",
                 "CleanupPending",
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -204,7 +267,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "True",
                 reason,
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
     }
 
@@ -232,8 +296,75 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 "Resource is being deleted or removed from managed scope.",
                 "False",
                 "CleanedUp",
-                message),
+                message,
+                securityPolicyNotRequested: false),
             cancellationToken);
+    }
+
+    private async Task UpdateConditionAsync(string @namespace, string name, V1Condition condition, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(@namespace) || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        for (var attempt = 1; attempt <= StatusPatchRetryCount; attempt++)
+        {
+            var resource = await kubernetes.CustomObjects.GetNamespacedCustomObjectAsync<TunnelPublicHostnameCustomResource>(
+                TunnelPublicHostnameCustomResource.Group,
+                TunnelPublicHostnameCustomResource.Version,
+                @namespace,
+                TunnelPublicHostnameCustomResource.PluralName,
+                name,
+                cancellationToken).ConfigureAwait(false);
+
+            var status = resource.Status ?? new TunnelPublicHostnameStatus();
+            var conditions = status.Conditions
+                .Where(existing => !string.Equals(existing.Type, condition.Type, StringComparison.Ordinal))
+                .Append(condition)
+                .ToArray();
+
+            var patchDocument = new
+            {
+                status = new
+                {
+                    conditions = conditions.Select(current => new
+                    {
+                        type = current.Type,
+                        status = current.Status,
+                        reason = current.Reason,
+                        message = current.Message,
+                        lastTransitionTime = current.LastTransitionTime,
+                        observedGeneration = current.ObservedGeneration,
+                    }).ToArray(),
+                },
+            };
+
+            var patch = new V1Patch(
+                JsonSerializer.Serialize(patchDocument, JsonOptions),
+                V1Patch.PatchType.MergePatch);
+
+            try
+            {
+                _ = await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
+                    patch,
+                    TunnelPublicHostnameCustomResource.Group,
+                    TunnelPublicHostnameCustomResource.Version,
+                    @namespace,
+                    TunnelPublicHostnameCustomResource.PluralName,
+                    name,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                return;
+            }
+            catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.Conflict && attempt < StatusPatchRetryCount)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return;
+            }
+        }
     }
 
     private async Task UpdateStatusAsync(string @namespace, string name, TunnelPublicHostnameStatus status, CancellationToken cancellationToken)
@@ -307,7 +438,8 @@ public sealed class KubernetesRouteIntentStatusUpdater(
         string specValidMessage,
         string cleanupStatus,
         string cleanupReason,
-        string cleanupMessage)
+        string cleanupMessage,
+        bool securityPolicyNotRequested)
     {
         var status = new TunnelPublicHostnameStatus
         {
@@ -320,6 +452,10 @@ public sealed class KubernetesRouteIntentStatusUpdater(
         status.Conditions.Add(CreateCondition("Ready", readyStatus, readyReason, readyMessage, observedGeneration));
         status.Conditions.Add(CreateCondition("SpecValid", specValidStatus, specValidReason, specValidMessage, observedGeneration));
         status.Conditions.Add(CreateCondition("Cleanup", cleanupStatus, cleanupReason, cleanupMessage, observedGeneration));
+        status.Conditions.Add(
+            securityPolicyNotRequested
+                ? CreateCondition("SecurityPolicyReady", "True", "NotRequested", "No security policy reconciliation requested.", observedGeneration)
+                : CreateCondition("SecurityPolicyReady", "False", "Pending", "Security policy reconciliation pending.", observedGeneration));
         return status;
     }
 

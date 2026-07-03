@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine3.23 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.301-alpine3.23 AS build
 WORKDIR /src
 
 ARG BUILD_MAJOR=0

@@ -14,6 +14,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
     IKubernetes kubernetes,
     IOptions<KubernetesOperatorOptions> options,
     IOptions<RoutingOperatorOptions> routingOptions,
+    ICloudflareZoneResolver zoneResolver,
     IManagedTunnelPublicHostnameValidator managedValidator,
     ILogger<KubernetesTunnelPublicHostnameClient> logger)
 {
@@ -48,11 +49,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         {
             try
             {
-                managedRoutes.Add(new ManagedRouteIntent(
-                    resource.Metadata.Name ?? string.Empty,
-                    resource.Metadata.NamespaceProperty ?? string.Empty,
-                    resource.Metadata.Generation,
-                    await ToRouteAsync(resource, routingOptions.Value.OwnershipTag, cancellationToken).ConfigureAwait(false)));
+                managedRoutes.Add(await ToManagedRouteIntentAsync(resource, cancellationToken).ConfigureAwait(false));
             }
             catch (ArgumentException ex)
             {
@@ -155,11 +152,7 @@ public sealed class KubernetesTunnelPublicHostnameClient(
         try
         {
             return (
-                new ManagedRouteIntent(
-                resource.Metadata.Name ?? string.Empty,
-                resource.Metadata.NamespaceProperty ?? string.Empty,
-                resource.Metadata.Generation,
-                await ToRouteAsync(resource, routingOptions.Value.OwnershipTag, cancellationToken).ConfigureAwait(false)),
+                await ToManagedRouteIntentAsync(resource, cancellationToken).ConfigureAwait(false),
                 null);
         }
         catch (ArgumentException ex)
@@ -280,6 +273,24 @@ public sealed class KubernetesTunnelPublicHostnameClient(
                 : throw new InvalidOperationException($"Unsupported origin protocol '{protocol}'.");
     }
 
+    private async Task<ManagedRouteIntent> ToManagedRouteIntentAsync(
+        TunnelPublicHostnameCustomResource resource,
+        CancellationToken cancellationToken)
+    {
+        var ownershipTag = routingOptions.Value.OwnershipTag;
+
+        return new ManagedRouteIntent(
+            resource.Metadata.Name ?? string.Empty,
+            resource.Metadata.NamespaceProperty ?? string.Empty,
+            resource.Metadata.Generation,
+            await ToRouteAsync(resource, ownershipTag, cancellationToken).ConfigureAwait(false),
+            ToSecurityPolicy(
+                resource,
+                ownershipTag,
+                routingOptions.Value.SecurityPoliciesEnabled,
+                routingOptions.Value.AllowEnterpriseOnlyRateLimitActions));
+    }
+
     private async Task<PublicHostnameRoute> ToRouteAsync(
         TunnelPublicHostnameCustomResource resource,
         string ownershipTag,
@@ -353,6 +364,103 @@ public sealed class KubernetesTunnelPublicHostnameClient(
 
         var protocol = ParseProtocol(origin.Protocol);
         return PublicHostnameRoute.Create(resource.Spec.Hostname, origin.Url, protocol, ownershipTag);
+    }
+
+    private HostnameSecurityPolicy? ToSecurityPolicy(
+        TunnelPublicHostnameCustomResource resource,
+        string ownershipTag,
+        bool securityPoliciesEnabled,
+        bool allowEnterpriseOnlyRateLimitActions)
+    {
+        if (!securityPoliciesEnabled)
+        {
+            return null;
+        }
+
+        var rateLimit = resource.Spec.Cloudflare.Security?.RateLimit;
+
+        if (rateLimit is not { Enabled: true })
+        {
+            return null;
+        }
+
+        if (rateLimit.Rules.Count == 0)
+        {
+            throw new InvalidOperationException("spec.cloudflare.security.rateLimit.rules must contain at least one rule when rate limiting is enabled.");
+        }
+
+        var rules = rateLimit.Rules
+            .Select(rule => ToRateLimitRule(resource.Spec.Hostname, rule, allowEnterpriseOnlyRateLimitActions))
+            .ToArray();
+
+        var zoneId = zoneResolver.ResolveZoneId(resource.Spec.Hostname);
+
+        return new HostnameSecurityPolicy(resource.Spec.Hostname, zoneId, ownershipTag, rules);
+    }
+
+    private static HostnameRateLimitRule ToRateLimitRule(
+        string hostname,
+        CloudflareRateLimitRuleSpec rule,
+        bool allowEnterpriseOnlyRateLimitActions)
+    {
+        if (string.IsNullOrWhiteSpace(rule.Name))
+        {
+            throw new InvalidOperationException("spec.cloudflare.security.rateLimit.rules[].name is required.");
+        }
+
+        if (rule.RequestsPerPeriod <= 0)
+        {
+            throw new InvalidOperationException("spec.cloudflare.security.rateLimit.rules[].requestsPerPeriod must be greater than zero.");
+        }
+
+        if (rule.PeriodSeconds <= 0)
+        {
+            throw new InvalidOperationException("spec.cloudflare.security.rateLimit.rules[].periodSeconds must be greater than zero.");
+        }
+
+        var action = rule.Action.Trim();
+        if (!IsSupportedRateLimitAction(action, allowEnterpriseOnlyRateLimitActions))
+        {
+            throw new InvalidOperationException(
+                allowEnterpriseOnlyRateLimitActions
+                    ? "spec.cloudflare.security.rateLimit.rules[].action must be one of block, challenge, managed_challenge, or log."
+                    : "spec.cloudflare.security.rateLimit.rules[].action must be one of block, challenge, or managed_challenge. The log action is Enterprise-only and must be explicitly enabled by the operator administrator.");
+        }
+
+        var expression = ResolveRateLimitExpression(hostname, rule);
+
+        return new HostnameRateLimitRule(
+            rule.Name.Trim(),
+            expression,
+            rule.RequestsPerPeriod,
+            rule.PeriodSeconds,
+            action);
+    }
+
+    private static string ResolveRateLimitExpression(string hostname, CloudflareRateLimitRuleSpec rule)
+    {
+        if (!string.IsNullOrWhiteSpace(rule.Expression))
+        {
+            return rule.Expression.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(rule.PathPrefix))
+        {
+            throw new InvalidOperationException("spec.cloudflare.security.rateLimit.rules[].pathPrefix or expression is required.");
+        }
+
+        var escapedHostname = hostname.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        var escapedPathPrefix = rule.PathPrefix.Trim().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+
+        return $"(http.host eq \"{escapedHostname}\" and starts_with(http.request.uri.path, \"{escapedPathPrefix}\"))";
+    }
+
+    private static bool IsSupportedRateLimitAction(string action, bool allowEnterpriseOnlyRateLimitActions)
+    {
+        return string.Equals(action, "block", StringComparison.Ordinal)
+            || string.Equals(action, "challenge", StringComparison.Ordinal)
+            || string.Equals(action, "managed_challenge", StringComparison.Ordinal)
+            || (allowEnterpriseOnlyRateLimitActions && string.Equals(action, "log", StringComparison.Ordinal));
     }
 
     private Uri ResolveIngressTargetUrl(TunnelIngressTargetSpec ingress)

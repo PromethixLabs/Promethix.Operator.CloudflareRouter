@@ -2,6 +2,8 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Promethix.CloudflareTunnelOperator.Hosting.Admission;
+using Promethix.CloudflareTunnelOperator.Routing.Application;
+using Promethix.CloudflareTunnelOperator.Routing.Integrations.Cloudflare;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
 namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
@@ -22,6 +24,27 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         };
 
         var response = await service.ValidateAsync(review, CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ValidateAsyncShouldAllowDeletingManagedResourceUpdates()
+    {
+        var service = CreateService();
+        var resource = CreateResource("public", "delta-public", "rate-limit-test.promethix.dev");
+        resource.Metadata.DeletionTimestamp = DateTime.UtcNow;
+        resource.Spec.Target = new TunnelTargetSpec
+        {
+            Mode = "ingress",
+            Ingress = new TunnelIngressTargetSpec
+            {
+                ClassName = "traefik-cloudflare-tunnel",
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("UPDATE", resource), CancellationToken.None);
 
         _ = response.Response.Should().NotBeNull();
         _ = response.Response.Allowed.Should().BeTrue();
@@ -119,8 +142,142 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
             "spec.target.ingress.service is not allowed by this operator. Allowed modes are Disabled, ConfiguredTargetOnly, or Any.");
     }
 
-    private static TunnelPublicHostnameAdmissionService CreateService()
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitedHostnameWhenZoneMappingIsMissing()
     {
+        var service = CreateService(routingConfigure: options => options.SecurityPoliciesEnabled = true);
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 10,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "No Cloudflare zone is configured for hostname 'whoami.example.com'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
+    }
+
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitPeriodWhenUnsupported()
+    {
+        var service = CreateService(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].periodSeconds value '60' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: 10.");
+    }
+
+
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitExpressionWithUnsupportedBotScoreIdentifier()
+    {
+        var service = CreateService(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            Expression = "cf.client.bot_score < 1",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 10,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier 'cf.client.bot_score' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
+    }
+    private static TunnelPublicHostnameAdmissionService CreateService(
+        Action<RoutingOperatorOptions>? routingConfigure = null,
+        Action<CloudflareTunnelOptions>? cloudflareConfigure = null)
+    {
+        var routingOptions = new RoutingOperatorOptions
+        {
+            OwnershipTag = "promethix-cloudflare-tunnel-operator",
+        };
+        routingConfigure?.Invoke(routingOptions);
+
+        var cloudflareOptions = new CloudflareTunnelOptions();
+        cloudflareConfigure?.Invoke(cloudflareOptions);
+
         var managedValidator = new ManagedTunnelPublicHostnameValidator(
             Options.Create(new KubernetesOperatorOptions
             {
@@ -133,6 +290,8 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
                 OwnershipConfigMapNamespace = "edge-system",
                 OwnershipConfigMapName = "promethix-cloudflare-tunnel-operator-ownership",
             }),
+            Options.Create(routingOptions),
+            new CloudflareZoneResolver(Options.Create(cloudflareOptions)),
             new AcceptingHostnameOwnershipValidator(),
             new AcceptingIngressTargetValidator());
 
@@ -192,3 +351,4 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         }
     }
 }
+

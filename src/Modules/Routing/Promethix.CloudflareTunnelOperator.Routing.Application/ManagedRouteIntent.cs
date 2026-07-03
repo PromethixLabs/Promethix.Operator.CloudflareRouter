@@ -6,4 +6,5 @@ public sealed record ManagedRouteIntent(
     string Name,
     string Namespace,
     long? Generation,
-    PublicHostnameRoute Route);
+    PublicHostnameRoute Route,
+    HostnameSecurityPolicy? SecurityPolicy = null);
