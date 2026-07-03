@@ -92,6 +92,34 @@ public sealed class RouteMutationSafetyEvaluatorTests
     }
 
     [Fact]
+    public async Task TargetedReconcileShouldProceedAfterWatchActivityWhenInitialBlockWasStartupOnly()
+    {
+        var state = new OperatorState();
+        state.MarkInitialFullInventoryPass(
+            DateTimeOffset.UtcNow,
+            startupSafeForMutation: false,
+            reason: "StartupInventoryIncomplete",
+            message: "Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
+        _ = state.MarkWatchActivityObserved();
+
+        var evaluator = new RouteMutationSafetyEvaluator(
+            new StubOwnershipStore(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            state,
+            NullLogger<RouteMutationSafetyEvaluator>.Instance);
+
+        var intent = new ManagedRouteIntent("app", "demo", 1, CreateRoute("one.example.com"));
+        var plan = new RoutePlan([], [CreateRoute("one.example.com")], [], []);
+
+        var decision = await evaluator.EvaluateManagedRouteReconcileAsync(
+            CreateOptions(),
+            intent,
+            plan,
+            CancellationToken.None);
+
+        _ = decision.AllowApply.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task CleanupShouldRespectMutationMode()
     {
         var state = new OperatorState();
@@ -113,6 +141,33 @@ public sealed class RouteMutationSafetyEvaluatorTests
 
         _ = decision.AllowApply.Should().BeFalse();
         _ = decision.Reason.Should().Be("MutationModeRestricted");
+    }
+
+    [Fact]
+    public async Task CleanupShouldProceedAfterWatchActivityWhenInitialBlockWasStartupOnly()
+    {
+        var state = new OperatorState();
+        state.MarkInitialFullInventoryPass(
+            DateTimeOffset.UtcNow,
+            startupSafeForMutation: false,
+            reason: "StartupInventoryIncomplete",
+            message: "Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
+        _ = state.MarkWatchActivityObserved();
+
+        var evaluator = new RouteMutationSafetyEvaluator(
+            new StubOwnershipStore(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            state,
+            NullLogger<RouteMutationSafetyEvaluator>.Instance);
+
+        var plan = new RoutePlan([], [], [CreateRoute("one.example.com")], []);
+
+        var decision = await evaluator.EvaluateCleanupAsync(
+            CreateOptions(mutationMode: "Full"),
+            "one.example.com",
+            plan,
+            CancellationToken.None);
+
+        _ = decision.AllowApply.Should().BeTrue();
     }
 
     private static RoutingOperatorOptions CreateOptions(

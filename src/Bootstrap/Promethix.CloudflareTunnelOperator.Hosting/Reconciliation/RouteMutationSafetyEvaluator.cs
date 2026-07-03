@@ -9,6 +9,8 @@ internal sealed class RouteMutationSafetyEvaluator(
     OperatorState state,
     ILogger<RouteMutationSafetyEvaluator> logger) : IRouteMutationSafetyEvaluator
 {
+    private const string StartupInventoryIncompleteReason = "StartupInventoryIncomplete";
+
     private static readonly Action<ILogger, int, int, int, int, Exception?> LogFullInventorySummary =
         LoggerMessage.Define<int, int, int, int>(
             LogLevel.Information,
@@ -50,7 +52,7 @@ internal sealed class RouteMutationSafetyEvaluator(
         {
             var decision = new RouteMutationSafetyDecision(
                 false,
-                "StartupInventoryIncomplete",
+                StartupInventoryIncompleteReason,
                 "Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
             LogBlocked(decision);
             return decision;
@@ -83,11 +85,11 @@ internal sealed class RouteMutationSafetyEvaluator(
             return Task.FromResult(mutationModeDecision);
         }
 
-        if (options.StartupProtectionEnabled && !state.IsStartupSafeForMutation)
+        if (options.StartupProtectionEnabled && !IsStartupSafeForTargetedMutation())
         {
             var decision = new RouteMutationSafetyDecision(
                 false,
-                "StartupInventoryIncomplete",
+                StartupInventoryIncompleteReason,
                 "Targeted reconciliation is blocked until an initial full inventory reconciliation completes safely.");
             LogBlocked(decision);
             return Task.FromResult(decision);
@@ -113,17 +115,25 @@ internal sealed class RouteMutationSafetyEvaluator(
             return Task.FromResult(mutationModeDecision);
         }
 
-        if (options.StartupProtectionEnabled && !state.IsStartupSafeForMutation)
+        if (options.StartupProtectionEnabled && !IsStartupSafeForTargetedMutation())
         {
             var decision = new RouteMutationSafetyDecision(
                 false,
-                "StartupInventoryIncomplete",
+                StartupInventoryIncompleteReason,
                 "Cleanup deletes are blocked until an initial full inventory reconciliation completes safely.");
             LogBlocked(decision);
             return Task.FromResult(decision);
         }
 
         return Task.FromResult(new RouteMutationSafetyDecision(true));
+    }
+
+    private bool IsStartupSafeForTargetedMutation()
+    {
+        return state.IsStartupSafeForMutation
+            || (state.HasCompletedInitialFullInventoryPass
+                && state.HasObservedWatchActivity
+                && string.Equals(state.StartupBlockReason, StartupInventoryIncompleteReason, StringComparison.Ordinal));
     }
 
     private static RouteMutationSafetyDecision EvaluateMutationMode(RoutingOperatorOptions options, RoutePlan plan)
@@ -195,3 +205,4 @@ internal sealed class RouteMutationSafetyEvaluator(
             null);
     }
 }
+

@@ -168,9 +168,6 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
     {
         return new CloudflareRulesetWriteModel
         {
-            Name = ruleset.Name,
-            Kind = ruleset.Kind,
-            Phase = ruleset.Phase,
             Rules =
             [
                 .. ruleset.Rules.Select(
@@ -246,3 +243,5 @@ public sealed class CloudflareHostnameSecurityPolicyClient(
         return parts.Length >= 4 ? parts[^1] : rule.Description;
     }
 }
+
+

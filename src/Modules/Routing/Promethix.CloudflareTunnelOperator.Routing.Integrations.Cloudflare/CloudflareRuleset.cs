@@ -18,12 +18,6 @@ internal sealed class CloudflareRuleset
 
 internal sealed class CloudflareRulesetWriteModel
 {
-    public string Name { get; set; } = "Promethix Cloudflare Tunnel Operator rate limits";
-
-    public string Kind { get; set; } = "zone";
-
-    public string Phase { get; set; } = "http_ratelimit";
-
     public List<CloudflareRulesetRuleWriteModel> Rules { get; set; } = [];
 }
 
@@ -72,4 +66,3 @@ internal sealed class CloudflareRateLimit
     [JsonPropertyName("mitigation_timeout")]
     public int MitigationTimeout { get; set; }
 }
-

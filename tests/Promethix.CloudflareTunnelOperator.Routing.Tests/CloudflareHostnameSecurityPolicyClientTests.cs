@@ -47,8 +47,10 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         var rule = document.RootElement.GetProperty("rules")[0];
 
         _ = document.RootElement.TryGetProperty("id", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("name", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("kind", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("phase", out _).Should().BeFalse();
         _ = rule.TryGetProperty("id", out _).Should().BeFalse();
-        _ = document.RootElement.GetProperty("phase").GetString().Should().Be("http_ratelimit");
         _ = rule.GetProperty("action").GetString().Should().Be("managed_challenge");
         _ = rule.GetProperty("expression").GetString().Should().Be("(http.host eq \"api.example.com\" and starts_with(http.request.uri.path, \"/v1/\"))");
         _ = rule.GetProperty("description").GetString().Should().Be("promethix-cloudflare-tunnel-operator:owner:api.example.com:api-v1");
@@ -100,6 +102,9 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
 
+        _ = document.RootElement.TryGetProperty("name", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("kind", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("phase", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("requests_per_period").GetInt32().Should().Be(60);
     }
 
@@ -131,6 +136,9 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         using var document = JsonDocument.Parse(body);
 
         _ = document.RootElement.TryGetProperty("id", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("name", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("kind", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("phase", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].TryGetProperty("id", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules")[0].GetProperty("ratelimit").GetProperty("mitigation_timeout").GetInt32().Should().Be(60);
     }
@@ -177,6 +185,9 @@ public sealed class CloudflareHostnameSecurityPolicyClientTests
         _ = write.RequestUri!.ToString().Should().Be("https://api.cloudflare.com/client/v4/zones/zone-id/rulesets/phases/http_ratelimit/entrypoint");
         var body = await write.Content!.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
+        _ = document.RootElement.TryGetProperty("name", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("kind", out _).Should().BeFalse();
+        _ = document.RootElement.TryGetProperty("phase", out _).Should().BeFalse();
         _ = document.RootElement.GetProperty("rules").GetArrayLength().Should().Be(0);
     }
 
