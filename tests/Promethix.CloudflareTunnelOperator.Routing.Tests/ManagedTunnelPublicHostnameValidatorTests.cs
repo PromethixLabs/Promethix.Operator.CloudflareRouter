@@ -148,7 +148,7 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
                             Name = "api",
                             PathPrefix = "/",
                             RequestsPerPeriod = 10,
-                            PeriodSeconds = 60,
+                            PeriodSeconds = 10,
                             Action = "block",
                         },
                     ],
@@ -192,7 +192,7 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
                             Name = "api",
                             PathPrefix = "/",
                             RequestsPerPeriod = 10,
-                            PeriodSeconds = 60,
+                            PeriodSeconds = 10,
                             Action = "block",
                         },
                     ],
@@ -203,6 +203,50 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         var act = () => validator.ValidateAsync(resource, CancellationToken.None);
 
         _ = await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task ValidateAsyncRejectsRateLimitedHostnameWhenPeriodIsUnsupported()
+    {
+        var validator = CreateValidator(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "apps.example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].periodSeconds value '60' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: 10.");
     }
 
 
@@ -235,7 +279,7 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
                             Name = "api",
                             Expression = "cf.client.bot_score < 1",
                             RequestsPerPeriod = 10,
-                            PeriodSeconds = 60,
+                            PeriodSeconds = 10,
                             Action = "block",
                         },
                     ],

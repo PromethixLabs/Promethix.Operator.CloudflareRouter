@@ -161,7 +161,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
                             Name = "api",
                             PathPrefix = "/",
                             RequestsPerPeriod = 10,
-                            PeriodSeconds = 60,
+                            PeriodSeconds = 10,
                             Action = "block",
                         },
                     ],
@@ -175,6 +175,50 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         _ = response.Response.Allowed.Should().BeFalse();
         _ = response.Response.Status!.Message.Should().Be(
             "No Cloudflare zone is configured for hostname 'whoami.example.com'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
+    }
+
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitPeriodWhenUnsupported()
+    {
+        var service = CreateService(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            PathPrefix = "/",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].periodSeconds value '60' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: 10.");
     }
 
 
@@ -206,7 +250,7 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
                             Name = "api",
                             Expression = "cf.client.bot_score < 1",
                             RequestsPerPeriod = 10,
-                            PeriodSeconds = 60,
+                            PeriodSeconds = 10,
                             Action = "block",
                         },
                     ],

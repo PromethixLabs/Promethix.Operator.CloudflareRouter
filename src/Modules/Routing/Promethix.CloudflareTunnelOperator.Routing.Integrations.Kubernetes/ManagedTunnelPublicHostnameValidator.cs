@@ -12,6 +12,7 @@ public sealed class ManagedTunnelPublicHostnameValidator(
     IIngressTargetValidator ingressTargetValidator) : IManagedTunnelPublicHostnameValidator
 {
     private static readonly string[] UnsupportedRateLimitIdentifiers = ["cf.client.bot_score"];
+    private static readonly int[] SupportedRateLimitPeriods = [10];
 
     public bool IsManaged(TunnelPublicHostnameCustomResource resource)
     {
@@ -123,8 +124,20 @@ public sealed class ManagedTunnelPublicHostnameValidator(
     {
         foreach (var rule in rules)
         {
+            ValidateRateLimitPeriod(rule);
             ValidateRateLimitExpression(rule);
         }
+    }
+
+    private static void ValidateRateLimitPeriod(CloudflareRateLimitRuleSpec rule)
+    {
+        if (rule.PeriodSeconds <= 0 || SupportedRateLimitPeriods.Contains(rule.PeriodSeconds))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"spec.cloudflare.security.rateLimit.rules[].periodSeconds value '{rule.PeriodSeconds}' is not supported by this operator's current Cloudflare rate-limit entitlement contract. Supported values: {string.Join(", ", SupportedRateLimitPeriods)}.");
     }
 
     private static void ValidateRateLimitExpression(CloudflareRateLimitRuleSpec rule)

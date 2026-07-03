@@ -395,7 +395,7 @@ public sealed class TunnelPublicHostnameMappingTests
                                     Name = "api-v1",
                                     PathPrefix = "/v1/",
                                     RequestsPerPeriod = 60,
-                                    PeriodSeconds = 60,
+                                    PeriodSeconds = 10,
                                     Action = "managed_challenge",
                                 },
                             ],
@@ -420,7 +420,7 @@ public sealed class TunnelPublicHostnameMappingTests
         _ = rule.Name.Should().Be("api-v1");
         _ = rule.Expression.Should().Be("(http.host eq \"api.delta.promethix.net\" and starts_with(http.request.uri.path, \"/v1/\"))");
         _ = rule.RequestsPerPeriod.Should().Be(60);
-        _ = rule.PeriodSeconds.Should().Be(60);
+        _ = rule.PeriodSeconds.Should().Be(10);
         _ = rule.Action.Should().Be("managed_challenge");
     }
 
@@ -685,7 +685,7 @@ public sealed class TunnelPublicHostnameMappingTests
                                     Name = "api-v1",
                                     PathPrefix = "/v1/",
                                     RequestsPerPeriod = 60,
-                                    PeriodSeconds = 60,
+                                    PeriodSeconds = 10,
                                     Action = action,
                                 },
                             ],
