@@ -145,7 +145,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
     ResultStatusCodes =
     {
         [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+        [HealthStatus.Degraded] = StatusCodes.Status200OK,
         [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
     },
 });
@@ -178,3 +178,4 @@ static bool TryLoadWebhookCertificate(
         return false;
     }
 }
+

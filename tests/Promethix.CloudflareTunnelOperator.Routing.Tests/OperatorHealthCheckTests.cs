@@ -38,6 +38,31 @@ public sealed class OperatorHealthCheckTests
     }
 
     [Fact]
+    public async Task ReadinessShouldBeDegradedWhenWritesAreBlockedByStartupSafety()
+    {
+        var state = new OperatorState();
+        state.MarkInitialFullInventoryPass(
+            DateTimeOffset.UtcNow,
+            startupSafeForMutation: false,
+            reason: "StartupInventoryIncomplete",
+            message: "Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
+
+        var healthCheck = new OperatorReadinessHealthCheck(
+            state,
+            new AdmissionWebhookRuntimeState { Enabled = false },
+            Options.Create(new RoutingOperatorOptions
+            {
+                ApplyChanges = true,
+            }));
+
+        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
+
+        _ = result.Status.Should().Be(HealthStatus.Degraded);
+        _ = result.Description.Should().Be("Cloudflare writes are blocked until the Kubernetes watch has reported initial activity.");
+        _ = result.Data["reason"].Should().Be("StartupInventoryIncomplete");
+    }
+
+    [Fact]
     public async Task LivenessShouldStayHealthyWhileWaitingForWebhookTlsFiles()
     {
         var webhookState = new AdmissionWebhookRuntimeState
