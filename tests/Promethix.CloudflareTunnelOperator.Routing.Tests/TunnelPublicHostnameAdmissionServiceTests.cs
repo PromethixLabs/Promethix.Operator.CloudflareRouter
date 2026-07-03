@@ -177,6 +177,50 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
             "No Cloudflare zone is configured for hostname 'whoami.example.com'. Configure CloudflareTunnel:ZoneMappings or the legacy CloudflareTunnel:ZoneId.");
     }
 
+
+    [Fact]
+    public async Task ValidateAsyncShouldRejectRateLimitExpressionWithUnsupportedBotScoreIdentifier()
+    {
+        var service = CreateService(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+        var resource = CreateResource("public", "delta-public", "whoami.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            Expression = "cf.client.bot_score < 1",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var response = await service.ValidateAsync(CreateReview("CREATE", resource), CancellationToken.None);
+
+        _ = response.Response.Should().NotBeNull();
+        _ = response.Response.Allowed.Should().BeFalse();
+        _ = response.Response.Status!.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier 'cf.client.bot_score' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
+    }
     private static TunnelPublicHostnameAdmissionService CreateService(
         Action<RoutingOperatorOptions>? routingConfigure = null,
         Action<CloudflareTunnelOptions>? cloudflareConfigure = null)
@@ -263,3 +307,4 @@ public sealed class TunnelPublicHostnameAdmissionServiceTests
         }
     }
 }
+

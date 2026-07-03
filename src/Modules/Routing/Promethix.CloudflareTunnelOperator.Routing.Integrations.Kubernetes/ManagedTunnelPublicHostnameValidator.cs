@@ -11,6 +11,8 @@ public sealed class ManagedTunnelPublicHostnameValidator(
     IHostnameOwnershipValidator hostnameOwnershipValidator,
     IIngressTargetValidator ingressTargetValidator) : IManagedTunnelPublicHostnameValidator
 {
+    private static readonly string[] UnsupportedRateLimitIdentifiers = ["cf.client.bot_score"];
+
     public bool IsManaged(TunnelPublicHostnameCustomResource resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
@@ -113,7 +115,36 @@ public sealed class ManagedTunnelPublicHostnameValidator(
             return;
         }
 
+        ValidateRateLimitRules(rateLimit.Rules);
         _ = zoneResolver.ResolveZoneId(resource.Spec.Hostname);
+    }
+
+    private static void ValidateRateLimitRules(IReadOnlyCollection<CloudflareRateLimitRuleSpec> rules)
+    {
+        foreach (var rule in rules)
+        {
+            ValidateRateLimitExpression(rule);
+        }
+    }
+
+    private static void ValidateRateLimitExpression(CloudflareRateLimitRuleSpec rule)
+    {
+        if (string.IsNullOrWhiteSpace(rule.Expression))
+        {
+            return;
+        }
+
+        var expression = rule.Expression.Trim();
+        var unsupportedIdentifier = UnsupportedRateLimitIdentifiers.FirstOrDefault(identifier =>
+            expression.Contains(identifier, StringComparison.OrdinalIgnoreCase));
+
+        if (unsupportedIdentifier is null)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier '{unsupportedIdentifier}' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
     }
 
     private bool IsIngressServiceOverrideAllowed(TunnelIngressServiceTargetSpec service)

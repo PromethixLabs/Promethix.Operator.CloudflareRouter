@@ -205,6 +205,50 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         _ = await act.Should().NotThrowAsync();
     }
 
+
+    [Fact]
+    public async Task ValidateAsyncRejectsRateLimitExpressionWithUnsupportedBotScoreIdentifier()
+    {
+        var validator = CreateValidator(
+            routingConfigure: options => options.SecurityPoliciesEnabled = true,
+            cloudflareConfigure: options =>
+            {
+                options.ZoneMappings.Add(new CloudflareZoneMapping
+                {
+                    HostnameSuffix = "apps.example.com",
+                    ZoneId = "zone-1",
+                });
+            });
+
+        var resource = CreateIngressResource("whoami.apps.example.com");
+        resource.Spec.Cloudflare = new CloudflareRouteSpec
+        {
+            Security = new CloudflareSecuritySpec
+            {
+                RateLimit = new CloudflareRateLimitSpec
+                {
+                    Enabled = true,
+                    Rules =
+                    [
+                        new CloudflareRateLimitRuleSpec
+                        {
+                            Name = "api",
+                            Expression = "cf.client.bot_score < 1",
+                            RequestsPerPeriod = 10,
+                            PeriodSeconds = 60,
+                            Action = "block",
+                        },
+                    ],
+                },
+            },
+        };
+
+        var act = () => validator.ValidateAsync(resource, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        _ = exception.Which.Message.Should().Be(
+            "spec.cloudflare.security.rateLimit.rules[].expression uses unsupported identifier 'cf.client.bot_score' for Cloudflare http_ratelimit rulesets. Use pathPrefix-based matching or an expression limited to hostname/path predicates supported by that phase.");
+    }
     private static ManagedTunnelPublicHostnameValidator CreateValidator(
         Action<KubernetesOperatorOptions>? configure = null,
         Action<RoutingOperatorOptions>? routingConfigure = null,
@@ -291,3 +335,4 @@ public sealed class ManagedTunnelPublicHostnameValidatorTests
         }
     }
 }
+
