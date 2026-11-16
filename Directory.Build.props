@@ -8,6 +8,8 @@
     <AnalysisModeStyle>All</AnalysisModeStyle>
     <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' Or '$(DRONE)' == 'true'">true</ContinuousIntegrationBuild>

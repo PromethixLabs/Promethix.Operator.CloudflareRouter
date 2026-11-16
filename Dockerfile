@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0.301-alpine3.23 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404-alpine3.24 AS build
 WORKDIR /src
 
 ARG BUILD_MAJOR=0
@@ -13,10 +13,10 @@ ARG BUILD_DATE=unknown
 COPY . .
 RUN dotnet publish src/Bootstrap/Promethix.CloudflareTunnelOperator.Hosting/Promethix.CloudflareTunnelOperator.Hosting.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.9-alpine3.23
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-alpine3.24
 WORKDIR /app
 
-RUN apk upgrade --no-cache libcrypto3 libssl3
+RUN apk upgrade --no-cache
 
 ARG BUILD_MAJOR=0
 ARG BUILD_MINOR=0

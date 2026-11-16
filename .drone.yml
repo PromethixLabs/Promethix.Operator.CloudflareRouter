@@ -12,7 +12,7 @@ trigger:
 
 steps:
   - name: restore
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     environment:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
@@ -22,7 +22,7 @@ steps:
       - dotnet restore Promethix.CloudflareTunnelOperator.slnx
 
   - name: build
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     depends_on:
       - restore
     environment:
@@ -34,7 +34,7 @@ steps:
       - dotnet build Promethix.CloudflareTunnelOperator.slnx --configuration Release --no-restore
 
   - name: test
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     depends_on:
       - build
     environment:
@@ -79,7 +79,7 @@ trigger:
 
 steps:
   - name: restore
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     environment:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
@@ -89,7 +89,7 @@ steps:
       - dotnet restore Promethix.CloudflareTunnelOperator.slnx
 
   - name: build
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     depends_on:
       - restore
     environment:
@@ -101,7 +101,7 @@ steps:
       - dotnet build Promethix.CloudflareTunnelOperator.slnx --configuration Release --no-restore
 
   - name: test
-    image: mcr.microsoft.com/dotnet/sdk:10.0.301
+    image: mcr.microsoft.com/dotnet/sdk:10.0.404
     depends_on:
       - build
     environment:
