@@ -80,11 +80,14 @@ public sealed class CloudflareTunnelRouteClient(
             ownershipByHostname,
             options.Value.OwnershipTag);
 
-        await PutConfigurationAsync(
-            options.Value.AccountId,
-            options.Value.TunnelId,
-            updatedConfiguration,
-            cancellationToken).ConfigureAwait(false);
+        if (JsonSerializer.Serialize(currentConfiguration, JsonOptions) != JsonSerializer.Serialize(updatedConfiguration, JsonOptions))
+        {
+            await PutConfigurationAsync(
+                options.Value.AccountId,
+                options.Value.TunnelId,
+                updatedConfiguration,
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var updatedOwnership = new Dictionary<string, string>(ownershipByHostname, StringComparer.OrdinalIgnoreCase);
 

@@ -4,6 +4,14 @@ metadata:
   name: {{ include "promethix-cloudflare-tunnel-operator.name" . }}-ownership
   namespace: {{ .Values.operator.ownershipConfigMapNamespace }}
 rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames:
+      - {{ printf "%s-leader" .Values.operator.ownershipConfigMapName | quote }}
+    verbs: ["get", "update"]
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["create"]

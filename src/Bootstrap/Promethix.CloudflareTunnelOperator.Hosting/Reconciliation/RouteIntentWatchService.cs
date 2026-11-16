@@ -11,6 +11,7 @@ internal sealed class RouteIntentWatchService(
 {
     private static readonly TimeSpan WatchReconnectDelay = TimeSpan.FromSeconds(5);
     private const int WatchTimeoutSeconds = 300;
+    private readonly RouteIntentChangeFilter changeFilter = new();
 
     private static readonly Action<ILogger, Exception> LogWatchError =
         LoggerMessage.Define(
@@ -64,6 +65,11 @@ internal sealed class RouteIntentWatchService(
                            cancellationToken: cancellationToken).ConfigureAwait(false))
 #pragma warning restore CS0618
         {
+            if (!changeFilter.ShouldReconcile(eventType, resource))
+            {
+                continue;
+            }
+
             var @namespace = resource.Metadata.NamespaceProperty ?? string.Empty;
             var name = resource.Metadata.Name ?? string.Empty;
             var initialWatchActivity = state.MarkWatchActivityObserved();
@@ -77,9 +83,7 @@ internal sealed class RouteIntentWatchService(
 
             if (!string.IsNullOrWhiteSpace(@namespace) && !string.IsNullOrWhiteSpace(name))
             {
-                workQueue.EnqueueResource(
-                    new TunnelPublicHostnameResourceKey(@namespace, name),
-                    $"watch:{eventType}");
+                workQueue.EnqueueFullResync($"watch:{eventType}");
             }
             else
             {

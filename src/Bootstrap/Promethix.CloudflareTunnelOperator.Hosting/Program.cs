@@ -90,22 +90,26 @@ builder.Services.AddSingleton<TunnelPublicHostnameAdmissionService>();
 builder.Services.AddSingleton<IClusterRouteIntentSource, KubernetesRouteIntentSource>();
 builder.Services.AddSingleton<IManagedRouteOwnershipStore, KubernetesOwnershipStore>();
 builder.Services.AddSingleton<IRouteIntentStatusUpdater, KubernetesRouteIntentStatusUpdater>();
+builder.Services.AddSingleton<CloudflareRequestGate>();
+builder.Services.AddTransient<CloudflareRateLimitHandler>();
 builder.Services.AddHttpClient<ICloudflareTunnelRouteClient, CloudflareTunnelRouteClient>(
     (serviceProvider, httpClient) =>
     {
         var tunnelOptions = serviceProvider.GetRequiredService<IOptions<CloudflareTunnelOptions>>();
         httpClient.BaseAddress = new Uri("https://api.cloudflare.com/client/v4/");
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
         httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tunnelOptions.Value.ApiToken);
-    });
+    }).AddHttpMessageHandler<CloudflareRateLimitHandler>();
 builder.Services.AddHttpClient<ICloudflareHostnameSecurityPolicyClient, CloudflareHostnameSecurityPolicyClient>(
     (serviceProvider, httpClient) =>
     {
         var tunnelOptions = serviceProvider.GetRequiredService<IOptions<CloudflareTunnelOptions>>();
         httpClient.BaseAddress = new Uri("https://api.cloudflare.com/client/v4/");
+        httpClient.Timeout = Timeout.InfiniteTimeSpan;
         httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tunnelOptions.Value.ApiToken);
-    });
+    }).AddHttpMessageHandler<CloudflareRateLimitHandler>();
 builder.Services.AddHostedService<RouteIntentWatchService>();
 builder.Services.AddHostedService<OperatorWorker>();
 

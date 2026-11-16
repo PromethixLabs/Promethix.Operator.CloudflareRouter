@@ -11,6 +11,18 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
 public sealed class CloudflareTunnelRouteClientTests
 {
     [Fact]
+    public async Task UnchangedConfigurationDoesNotSendPut()
+    {
+        using var handler = new RecordingHttpMessageHandler(JsonResponse("""
+            {"success":true,"result":{"config":{"ingress":[{"service":"http_status:404"}]}}}
+            """));
+        using var httpClient = CreateHttpClient(handler);
+        var client = CreateClient(httpClient, new RecordingOwnershipStore(new Dictionary<string, string>()));
+        await client.ApplyAsync(new Routing.Domain.RoutePlan([], [], [], []), CancellationToken.None);
+        Assert.Equal(0, handler.Writes);
+    }
+
+    [Fact]
     public async Task GetRoutesShouldPruneOwnershipEntriesForMissingHostnames()
     {
         using var handler = new RecordingHttpMessageHandler(
@@ -95,10 +107,15 @@ public sealed class CloudflareTunnelRouteClientTests
 
     private sealed class RecordingHttpMessageHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
     {
+        public int Writes { get; private set; }
         private readonly Queue<HttpResponseMessage> responses = new(responses);
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.Method == HttpMethod.Put)
+            {
+                Writes++;
+            }
             return Task.FromResult(this.responses.Count > 0
                 ? this.responses.Dequeue()
                 : new HttpResponseMessage(HttpStatusCode.OK));

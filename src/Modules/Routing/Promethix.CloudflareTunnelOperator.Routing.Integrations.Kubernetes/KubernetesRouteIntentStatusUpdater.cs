@@ -310,15 +310,19 @@ public sealed class KubernetesRouteIntentStatusUpdater(
 
         for (var attempt = 1; attempt <= StatusPatchRetryCount; attempt++)
         {
-            var resource = await kubernetes.CustomObjects.GetNamespacedCustomObjectAsync<TunnelPublicHostnameCustomResource>(
-                TunnelPublicHostnameCustomResource.Group,
-                TunnelPublicHostnameCustomResource.Version,
-                @namespace,
-                TunnelPublicHostnameCustomResource.PluralName,
-                name,
-                cancellationToken).ConfigureAwait(false);
+            var resource = await ReadResourceAsync(@namespace, name, cancellationToken).ConfigureAwait(false);
+            if (resource is null)
+            {
+                return;
+            }
 
             var status = resource.Status ?? new TunnelPublicHostnameStatus();
+            var previous = status.Conditions.FirstOrDefault(existing => existing.Type == condition.Type);
+            PreserveTransitionTime(condition, previous);
+            if (previous is not null && JsonSerializer.Serialize(previous, JsonOptions) == JsonSerializer.Serialize(condition, JsonOptions))
+            {
+                return;
+            }
             var conditions = status.Conditions
                 .Where(existing => !string.Equals(existing.Type, condition.Type, StringComparison.Ordinal))
                 .Append(condition)
@@ -326,6 +330,7 @@ public sealed class KubernetesRouteIntentStatusUpdater(
 
             var patchDocument = new
             {
+                metadata = new { resourceVersion = resource.Metadata.ResourceVersion },
                 status = new
                 {
                     conditions = conditions.Select(current => new
@@ -374,34 +379,59 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             return;
         }
 
-        LogUpdatingStatus(logger, @namespace, name, status.Conditions[0].Reason ?? string.Empty, null);
-
-        var patchDocument = new
-        {
-            status = new
-            {
-                observedGeneration = status.ObservedGeneration,
-                ownershipTag = status.OwnershipTag,
-                appliedTunnelName = status.AppliedTunnelName,
-                appliedHostname = status.AppliedHostname,
-                conditions = status.Conditions.Select(condition => new
-                {
-                    type = condition.Type,
-                    status = condition.Status,
-                    reason = condition.Reason,
-                    message = condition.Message,
-                    lastTransitionTime = condition.LastTransitionTime,
-                    observedGeneration = condition.ObservedGeneration,
-                }).ToArray(),
-            },
-        };
-
-        var patch = new V1Patch(
-            JsonSerializer.Serialize(patchDocument, JsonOptions),
-            V1Patch.PatchType.MergePatch);
-
         for (var attempt = 1; attempt <= StatusPatchRetryCount; attempt++)
         {
+            var resource = await ReadResourceAsync(@namespace, name, cancellationToken).ConfigureAwait(false);
+            if (resource is null)
+            {
+                return;
+            }
+            var previousStatus = resource.Status;
+            foreach (var condition in status.Conditions)
+            {
+                PreserveTransitionTime(condition, previousStatus?.Conditions.FirstOrDefault(existing => existing.Type == condition.Type));
+            }
+
+            var previousSecurity = previousStatus?.Conditions.FirstOrDefault(existing => existing.Type == "SecurityPolicyReady");
+            var pendingSecurity = status.Conditions.FirstOrDefault(existing => existing.Type == "SecurityPolicyReady" && existing.Reason == "Pending");
+            if (previousSecurity is not null && pendingSecurity is not null && previousSecurity.ObservedGeneration == status.ObservedGeneration)
+            {
+                _ = status.Conditions.Remove(pendingSecurity);
+                status.Conditions.Add(previousSecurity);
+            }
+
+            if (JsonSerializer.Serialize(previousStatus, JsonOptions) == JsonSerializer.Serialize(status, JsonOptions))
+            {
+                return;
+            }
+
+            LogUpdatingStatus(logger, @namespace, name, status.Conditions[0].Reason ?? string.Empty, null);
+
+            var patchDocument = new
+            {
+                metadata = new { resourceVersion = resource.Metadata.ResourceVersion },
+                status = new
+                {
+                    observedGeneration = status.ObservedGeneration,
+                    ownershipTag = status.OwnershipTag,
+                    appliedTunnelName = status.AppliedTunnelName,
+                    appliedHostname = status.AppliedHostname,
+                    conditions = status.Conditions.Select(condition => new
+                    {
+                        type = condition.Type,
+                        status = condition.Status,
+                        reason = condition.Reason,
+                        message = condition.Message,
+                        lastTransitionTime = condition.LastTransitionTime,
+                        observedGeneration = condition.ObservedGeneration,
+                    }).ToArray(),
+                },
+            };
+
+            var patch = new V1Patch(
+                JsonSerializer.Serialize(patchDocument, JsonOptions),
+                V1Patch.PatchType.MergePatch);
+
             try
             {
                 _ = await kubernetes.CustomObjects.PatchNamespacedCustomObjectStatusAsync(
@@ -422,6 +452,20 @@ public sealed class KubernetesRouteIntentStatusUpdater(
             {
                 return;
             }
+        }
+    }
+
+    private async Task<TunnelPublicHostnameCustomResource?> ReadResourceAsync(string resourceNamespace, string name, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await kubernetes.CustomObjects.GetNamespacedCustomObjectAsync<TunnelPublicHostnameCustomResource>(
+                TunnelPublicHostnameCustomResource.Group, TunnelPublicHostnameCustomResource.Version,
+                resourceNamespace, TunnelPublicHostnameCustomResource.PluralName, name, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpOperationException ex) when (ex.Response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
         }
     }
 
@@ -457,6 +501,14 @@ public sealed class KubernetesRouteIntentStatusUpdater(
                 ? CreateCondition("SecurityPolicyReady", "True", "NotRequested", "No security policy reconciliation requested.", observedGeneration)
                 : CreateCondition("SecurityPolicyReady", "False", "Pending", "Security policy reconciliation pending.", observedGeneration));
         return status;
+    }
+
+    private static void PreserveTransitionTime(V1Condition condition, V1Condition? previous)
+    {
+        if (previous?.Status == condition.Status)
+        {
+            condition.LastTransitionTime = previous.LastTransitionTime;
+        }
     }
 
     private static V1Condition CreateCondition(

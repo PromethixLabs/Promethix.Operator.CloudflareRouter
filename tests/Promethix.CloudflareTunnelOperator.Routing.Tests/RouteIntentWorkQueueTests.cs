@@ -7,6 +7,19 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
 public sealed class RouteIntentWorkQueueTests
 {
     [Fact]
+    public async Task FullResyncSupersedesQueuedResources()
+    {
+        var queue = new RouteIntentWorkQueue();
+        queue.EnqueueResource(new TunnelPublicHostnameResourceKey("demo", "one"), "spec");
+        queue.EnqueueResource(new TunnelPublicHostnameResourceKey("demo", "two"), "spec");
+        queue.EnqueueFullResync("dependency");
+        var first = await queue.WaitAsync(TimeSpan.FromMilliseconds(10), CancellationToken.None);
+        var next = await queue.WaitAsync(TimeSpan.FromMilliseconds(10), CancellationToken.None);
+        Assert.Equal(RouteIntentWorkItemKind.FullResync, first.Kind);
+        Assert.Equal("interval", next.Reason);
+    }
+
+    [Fact]
     public async Task EnqueueResourceShouldDeduplicateByKey()
     {
         var queue = new RouteIntentWorkQueue();

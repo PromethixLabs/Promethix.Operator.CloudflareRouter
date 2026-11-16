@@ -26,9 +26,8 @@ internal sealed class RouteIntentWorkQueue
             }
 
             fullResyncPending = true;
+            _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, NormalizeReason(reason)));
         }
-
-        _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, NormalizeReason(reason)));
     }
 
     public void EnqueueResource(TunnelPublicHostnameResourceKey key, string reason)
@@ -39,27 +38,28 @@ internal sealed class RouteIntentWorkQueue
             {
                 return;
             }
+            _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.Resource, NormalizeReason(reason), key));
         }
-
-        _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.Resource, NormalizeReason(reason), key));
     }
 
     public async ValueTask<RouteIntentWorkItem> WaitAsync(TimeSpan fallbackInterval, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(fallbackInterval, TimeSpan.Zero);
 
-        var readTask = workItems.Reader.ReadAsync(cancellationToken).AsTask();
-        var delayTask = Task.Delay(fallbackInterval, cancellationToken);
-        var completedTask = await Task.WhenAny(readTask, delayTask).ConfigureAwait(false);
-
-        if (completedTask == readTask)
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(fallbackInterval);
+        try
         {
-            var item = await readTask.ConfigureAwait(false);
+            var item = await workItems.Reader.ReadAsync(timeout.Token).ConfigureAwait(false);
 
             lock (syncRoot)
             {
-                if (item.Kind == RouteIntentWorkItemKind.FullResync)
+                if (fullResyncPending || item.Kind == RouteIntentWorkItemKind.FullResync)
                 {
+                    item = new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, item.Reason);
+                    while (workItems.Reader.TryRead(out _))
+                    {
+                    }
                     fullResyncPending = false;
                     pendingResources.Clear();
                 }
@@ -72,7 +72,10 @@ internal sealed class RouteIntentWorkQueue
             return item;
         }
 
-        await delayTask.ConfigureAwait(false);
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+        }
+
         return new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, "interval");
     }
 

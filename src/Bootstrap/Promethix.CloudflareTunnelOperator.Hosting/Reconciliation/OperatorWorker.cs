@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Options;
+using k8s;
+using k8s.LeaderElection;
+using k8s.LeaderElection.ResourceLock;
 using Promethix.CloudflareTunnelOperator.Routing.Application;
 using Promethix.CloudflareTunnelOperator.Routing.Integrations.Kubernetes;
 
@@ -12,6 +15,8 @@ internal sealed class OperatorWorker(
     RouteIntentWorkQueue workQueue,
     IOptions<RoutingOperatorOptions> options,
     OperatorState state,
+    IKubernetes kubernetes,
+    IOptions<KubernetesOperatorOptions> kubernetesOptions,
     ILogger<OperatorWorker> logger) : BackgroundService
 {
     private static readonly Action<ILogger, string, int, int, int, int, bool, Exception?> LogReconciliationCompleted =
@@ -52,10 +57,69 @@ internal sealed class OperatorWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var identity = $"{Environment.MachineName}-{Guid.NewGuid():N}";
+        var settings = kubernetesOptions.Value;
+        using var elector = new LeaderElector(new LeaderElectionConfig(new LeaseLock(
+            kubernetes, settings.OwnershipConfigMapNamespace, settings.OwnershipConfigMapName + "-leader", identity))
+        {
+            LeaseDuration = TimeSpan.FromSeconds(60),
+            RenewDeadline = TimeSpan.FromSeconds(20),
+            RetryPeriod = TimeSpan.FromSeconds(5),
+        });
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            using var electionLifetime = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            using var leadership = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            var acquired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void Started()
+            {
+                LogReconciliationTriggered(logger, "leadership-acquired:" + identity, null);
+                _ = acquired.TrySetResult();
+            }
+            void Stopped()
+            {
+                leadership.Cancel();
+                LogReconciliationTriggered(logger, "leadership-lost:" + identity, null);
+            }
+            elector.OnStartedLeading += Started;
+            elector.OnStoppedLeading += Stopped;
+            var election = elector.RunUntilLeadershipLostAsync(electionLifetime.Token);
+            try
+            {
+                _ = await Task.WhenAny(acquired.Task, election).ConfigureAwait(false);
+                if (!acquired.Task.IsCompleted)
+                {
+                    await election.ConfigureAwait(false);
+                    continue;
+                }
+                await RunLeaderAsync(leadership.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (leadership.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                elector.OnStartedLeading -= Started;
+                elector.OnStoppedLeading -= Stopped;
+                await electionLifetime.CancelAsync().ConfigureAwait(false);
+                try
+                {
+                    await election.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (electionLifetime.IsCancellationRequested)
+                {
+                }
+            }
+        }
+    }
+
+    private async Task RunLeaderAsync(CancellationToken stoppingToken)
+    {
         workQueue.EnqueueFullResync("startup");
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken).ConfigureAwait(false);
             var workItem = await workQueue
                 .WaitAsync(TimeSpan.FromSeconds(options.Value.ReconciliationIntervalSeconds), stoppingToken)
                 .ConfigureAwait(false);
