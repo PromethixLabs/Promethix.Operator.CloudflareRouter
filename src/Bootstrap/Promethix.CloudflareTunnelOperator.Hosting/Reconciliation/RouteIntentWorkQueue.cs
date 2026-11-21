@@ -16,6 +16,8 @@ internal sealed class RouteIntentWorkQueue
     private readonly HashSet<TunnelPublicHostnameResourceKey> pendingResources = [];
     private bool fullResyncPending;
 
+    public int Depth { get { lock (syncRoot) { return fullResyncPending ? 1 : pendingResources.Count; } } }
+
     public void EnqueueFullResync(string reason)
     {
         lock (syncRoot)
@@ -36,6 +38,14 @@ internal sealed class RouteIntentWorkQueue
         {
             if (fullResyncPending || !pendingResources.Add(key))
             {
+                return;
+            }
+            if (pendingResources.Count > 256)
+            {
+                while (workItems.Reader.TryRead(out _)) { }
+                pendingResources.Clear();
+                fullResyncPending = true;
+                _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.FullResync, "queue-capacity"));
                 return;
             }
             _ = workItems.Writer.TryWrite(new RouteIntentWorkItem(RouteIntentWorkItemKind.Resource, NormalizeReason(reason), key));

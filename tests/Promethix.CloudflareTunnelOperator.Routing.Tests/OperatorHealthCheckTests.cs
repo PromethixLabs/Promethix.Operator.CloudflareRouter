@@ -14,7 +14,7 @@ public sealed class OperatorHealthCheckTests
     public async Task ReadinessShouldBeUnhealthyWhenWebhookIsEnabledAndListenerIsNotReady()
     {
         var state = new OperatorState();
-        state.MarkInitialFullInventoryPass(DateTimeOffset.UtcNow, startupSafeForMutation: true);
+        // A passive replica has never completed inventory. Webhook health still governs readiness.
 
         using var certificateFiles = CreateWebhookCertificateFiles();
         var webhookState = new AdmissionWebhookRuntimeState

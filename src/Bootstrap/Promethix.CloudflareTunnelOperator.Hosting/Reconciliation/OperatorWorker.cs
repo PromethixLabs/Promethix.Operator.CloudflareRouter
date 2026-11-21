@@ -57,6 +57,22 @@ internal sealed class OperatorWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try { await RunElectionAsync(stoppingToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
+#pragma warning disable CA1031
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                LogReconciliationFailed(logger, ex);
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task RunElectionAsync(CancellationToken stoppingToken)
+    {
         var identity = $"{Environment.MachineName}-{Guid.NewGuid():N}";
         var settings = kubernetesOptions.Value;
         using var elector = new LeaderElector(new LeaderElectionConfig(new LeaseLock(
@@ -124,7 +140,22 @@ internal sealed class OperatorWorker(
                 .WaitAsync(TimeSpan.FromSeconds(options.Value.ReconciliationIntervalSeconds), stoppingToken)
                 .ConfigureAwait(false);
 
-            await RunIterationAsync(workItem, stoppingToken).ConfigureAwait(false);
+            try
+            {
+                await RunIterationAsync(workItem, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+#pragma warning disable CA1031
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                // Includes failures thrown while reporting an earlier reconciliation failure.
+                LogReconciliationFailed(logger, ex);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).ConfigureAwait(false);
+            }
         }
     }
 

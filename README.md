@@ -271,3 +271,7 @@ Architecture notes are in [docs/architecture.md](docs/architecture.md).
 ## License
 
 Licensed under the GNU General Public License v2. See `LICENSE`.
+
+### Reconciliation incident and candidate validation
+
+Delta's affected production deployment used chart and image `1.2.0-rc2` and is paused at zero replicas through GitOps. See [the hardening candidate notes](docs/releases/1.2.1-hardening.md) for changes, diagnostics, staging gates and rollback. A candidate publication does not authorize restoring production replicas.

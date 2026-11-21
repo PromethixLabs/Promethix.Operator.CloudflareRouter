@@ -15,12 +15,12 @@ internal sealed class OperatorReadinessHealthCheck(
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        if (TryGetInitialInventoryResult(out var result))
+        if (TryGetWebhookResult(out var result))
         {
             return Task.FromResult(result);
         }
 
-        if (TryGetWebhookResult(out result))
+        if (TryGetInitialInventoryResult(out result))
         {
             return Task.FromResult(result);
         }

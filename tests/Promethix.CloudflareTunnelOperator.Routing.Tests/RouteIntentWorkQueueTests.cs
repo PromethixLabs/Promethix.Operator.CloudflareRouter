@@ -7,6 +7,19 @@ namespace Promethix.CloudflareTunnelOperator.Routing.Tests;
 public sealed class RouteIntentWorkQueueTests
 {
     [Fact]
+    public async Task BurstOfDistinctResourcesIsBoundedAndConvergesThroughFullPass()
+    {
+        var queue = new RouteIntentWorkQueue();
+        for (var index = 0; index < 1000; index++)
+        {
+            queue.EnqueueResource(new TunnelPublicHostnameResourceKey("demo", "app" + index), "spec");
+        }
+        Assert.InRange(queue.Depth, 1, 257);
+        var item = await queue.WaitAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        Assert.Equal(RouteIntentWorkItemKind.FullResync, item.Kind);
+        Assert.Equal(0, queue.Depth);
+    }
+    [Fact]
     public async Task FullResyncSupersedesQueuedResources()
     {
         var queue = new RouteIntentWorkQueue();

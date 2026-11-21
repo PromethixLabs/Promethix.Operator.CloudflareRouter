@@ -17,6 +17,7 @@ public sealed class WatchFeedbackRegressionTests
         resource.Metadata.Name = "app";
         resource.Metadata.NamespaceProperty = "tenant";
         Assert.True(filter.ShouldReconcile(WatchEventType.Added, resource));
+        Assert.False(filter.ShouldReconcile(WatchEventType.Bookmark, resource));
         for (var count = 0; count < 100; count++)
         {
             resource.Metadata.ResourceVersion = count.ToString(System.Globalization.CultureInfo.InvariantCulture);

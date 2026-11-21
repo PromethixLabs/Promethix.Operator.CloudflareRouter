@@ -120,6 +120,16 @@ builder.Services
 
 var app = builder.Build();
 
+app.MapGet("/metrics/cloudflare", (CloudflareRequestGate gate, RouteIntentWorkQueue queue, OperatorState state) => Results.Ok(new
+{
+    queueDepth = queue.Depth,
+    lastSuccessfulReconciliation = state.LastCompletedAtUtc,
+    attempts = gate.Attempts,
+    rateLimits = gate.RateLimits,
+    transientFailures = gate.TransientFailures,
+    retryAt = gate.RetryAt,
+}));
+
 app.MapGet("/", () => Results.Ok(new
 {
     service = "Promethix.CloudflareTunnelOperator",
